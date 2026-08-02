@@ -224,7 +224,7 @@ let fieldLocked=false; // 試合中はフィールド寸法を固定し、表示
 const AR_MAX=0.60, AR_MIN=0.42; // フィールドの縦横比（幅/高さ）の許容範囲＝スマホ基準
 const FIELD_H_MAX=860;          // 論理高さの上限。大画面でも盤面はスマホ大に保つ
 const NET_W=420, NET_H=860;     // オンライン対戦は両者この寸法で固定（幾何を完全一致させる）
-const PROTO=5;                  // 通信プロトコル版。食い違うと当たり判定がズレるため照合する
+const PROTO=6;                  // 通信プロトコル版。食い違うと当たり判定がズレるため照合する
 const NET_DEBUG=new URLSearchParams(location.search).has('debug');
 function fitView(){
   SC = Math.min(VW/W, VH/H, 1);   // 拡大はしない（大画面で巨大化させない）
@@ -1389,15 +1389,12 @@ function guestUpdate(dt){
     // 相手マレットはホストの権威座標をそのまま表示する。軸ごとの見かけの差を作らない。
     m.x=B.m1[0]; m.y=B.m1[1];
   }
-  if(B.m0 && !localMalletDragging() && performance.now()-NET.lastLocalMove>120){
-    // 操作中はローカル予測を優先し、指を離した後にホスト権威位置へ収束させる。
+  if(B.m0 && !localMalletDragging() && performance.now()-NET.lastLocalMove>300){
+    // ホストは受信位置へ即時反映するため、通常の小さな差は補間しない。
+    // 補間した座標を再送するフィードバックを避け、重大な同期外れだけを復旧する。
     const m=P[0].mallet;
     const d=dist(m.x,m.y,B.m0[0],B.m0[1]);
-    if(d>70){ m.x=B.m0[0]; m.y=B.m0[1]; }
-    else {
-      const k=Math.min(1,dt*20);
-      m.x+=(B.m0[0]-m.x)*k; m.y+=(B.m0[1]-m.y)*k;
-    }
+    if(d>140){ m.x=B.m0[0]; m.y=B.m0[1]; m.vx=0; m.vy=0; }
   }
   liveT+=dt; // 線フェード表示用（厳密でなくてよい）
   for(const p of P){ if(p.flashT>0) p.flashT-=dt; }
@@ -1492,7 +1489,15 @@ function pointerEnd(e){
   const rec=pointers.get(e.pointerId);
   pointers.delete(e.pointerId);
   if(!rec || rec.owner===null || phase!=='play') return;
-  if(rec.type==='mallet') return;
+  if(rec.type==='mallet'){
+    const m=P[rec.owner].mallet;
+    m.vx=0; m.vy=0;
+    if(mode==='net-guest' && rec.owner===0){
+      NET.lastLocalMove=performance.now();
+      sendGuestInput(); // 指を離した最終位置を待たずに送る
+    }
+    return;
+  }
   const f=toF(e);
   if(mode==='net-guest'){
     if(rec.gs){ netSendR({c:'se', id:rec.gs}); }
