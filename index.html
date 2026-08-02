@@ -224,9 +224,8 @@ let fieldLocked=false; // 試合中はフィールド寸法を固定し、表示
 const AR_MAX=0.60, AR_MIN=0.42; // フィールドの縦横比（幅/高さ）の許容範囲＝スマホ基準
 const FIELD_H_MAX=860;          // 論理高さの上限。大画面でも盤面はスマホ大に保つ
 const NET_W=420, NET_H=860;     // オンライン対戦は両者この寸法で固定（幾何を完全一致させる）
-const PROTO=3;                  // 通信プロトコル版。食い違うと当たり判定がズレるため照合する
-const NET_MALLET_RATE=26;       // ホスト上でゲストマレットを目標へ追従させる強さ
-const NET_MALLET_MAX_SPD=900;   // 1フレームの飛び越しを抑え、衝突を取りこぼさない上限
+const PROTO=4;                  // 通信プロトコル版。食い違うと当たり判定がズレるため照合する
+const NET_DEBUG=new URLSearchParams(location.search).has('debug');
 function fitView(){
   SC = Math.min(VW/W, VH/H, 1);   // 拡大はしない（大画面で巨大化させない）
   OX = (VW - W*SC)/2;
@@ -532,30 +531,45 @@ function setupServe(idx){
   ball.y = idx===0 ? midY()+H*0.2 : midY()-H*0.2;
   stallX=ball.x; stallY=ball.y;
 }
-function serveStrike(){
-  const p=P[servePlayer];
+function resolveMalletBall(p, isServe=false, sound=true){
   const m=p.mallet;
   const dx=ball.x-m.x, dy=ball.y-m.y;
   const d=Math.hypot(dx,dy), minD=BALL_R+m.r;
-  if(d < minD){
-    let nx, ny;
-    if(d > 1e-6){
-      nx=dx/d; ny=dy/d;
-    } else {
-      // 中心が完全一致しても接触を無視しない。マレットの進行方向、
-      // それも無ければ相手ゴール方向を分離方向として使う。
-      const ms=Math.hypot(m.vx,m.vy);
-      if(ms > 1){ nx=m.vx/ms; ny=m.vy/ms; }
-      else { nx=0; ny=servePlayer===0 ? -1 : 1; }
-    }
-    ball.x=m.x+nx*(minD+0.5); ball.y=m.y+ny*(minD+0.5);
+  if(d >= minD) return false;
+  let nx, ny;
+  if(d > 1e-6){
+    nx=dx/d; ny=dy/d;
+  } else {
+    // 中心が完全一致しても、相対速度または相手ゴール方向で必ず分離する。
+    const rvx=ball.vx-m.vx, rvy=ball.vy-m.vy;
+    const rs=Math.hypot(rvx,rvy);
+    if(rs > 1){ nx=-rvx/rs; ny=-rvy/rs; }
+    else { nx=0; ny=p.side===0 ? -1 : 1; }
+  }
+  ball.x=m.x+nx*(minD+0.5); ball.y=m.y+ny*(minD+0.5);
+  if(isServe){
     ball.vx=m.vx*0.9 + nx*60; ball.vy=m.vy*0.9 + ny*60;
     const s=Math.hypot(ball.vx,ball.vy);
     if(s < 160){ ball.vx += nx*(160-s); ball.vy += ny*(160-s); }
     capSpeed();
     servePlayer=-1;
-    beep(240,0.06,'triangle',0.05);
+    if(sound) beep(240,0.06,'triangle',0.05);
+    return true;
   }
+  const rvx=ball.vx-m.vx, rvy=ball.vy-m.vy;
+  const vd=rvx*nx+rvy*ny;
+  if(vd < 0){
+    ball.vx = m.vx*0.8 + (rvx - 2*vd*nx);
+    ball.vy = m.vy*0.8 + (rvy - 2*vd*ny);
+    const s=Math.hypot(ball.vx,ball.vy);
+    if(s < 140){ ball.vx += nx*(140-s); ball.vy += ny*(140-s); }
+    capSpeed();
+    if(sound) beep(240,0.05,'triangle',0.045);
+  }
+  return true;
+}
+function serveStrike(){
+  resolveMalletBall(P[servePlayer], true);
 }
 function scoreGoal(scorerIdx){
   const s=P[scorerIdx];
@@ -590,33 +604,7 @@ function stepBall(dt){
     }
     // マレットとの衝突
     for(const p of P){
-      const m=p.mallet;
-      const dx=ball.x-m.x, dy=ball.y-m.y;
-      const d=Math.hypot(dx,dy), minD=BALL_R+m.r;
-      if(d < minD){
-        let nx, ny;
-        if(d > 1e-6){
-          nx=dx/d; ny=dy/d;
-        } else {
-          // 高遅延入力でマレットが球の中心まで来ても必ず分離する。
-          const rvx=ball.vx-m.vx, rvy=ball.vy-m.vy;
-          const rs=Math.hypot(rvx,rvy);
-          if(rs > 1){ nx=-rvx/rs; ny=-rvy/rs; }
-          else { nx=0; ny=p.side===0 ? -1 : 1; }
-        }
-        ball.x = m.x + nx*(minD+0.5);
-        ball.y = m.y + ny*(minD+0.5);
-        const rvx=ball.vx-m.vx, rvy=ball.vy-m.vy;
-        const vd=rvx*nx+rvy*ny;
-        if(vd < 0){
-          ball.vx = m.vx*0.8 + (rvx - 2*vd*nx);
-          ball.vy = m.vy*0.8 + (rvy - 2*vd*ny);
-          const s=Math.hypot(ball.vx,ball.vy);
-          if(s < 140){ ball.vx += nx*(140-s); ball.vy += ny*(140-s); }
-          capSpeed();
-          beep(240,0.05,'triangle',0.045);
-        }
-      }
+      resolveMalletBall(p, false);
     }
     // 線分との衝突
     const now=performance.now();
@@ -776,7 +764,7 @@ const NET={
   sendAcc:0, mAcc:0, miSeq:0, miAck:-1, stSeq:0, lastStateSeq:-1, lastLocalMove:0,
   poll:null, code:null,
   lastHp:[3,3], lastSc:[0,0],
-  target:{ b:null, m0:null, m1:null },
+  target:{ b:null, m0:null, m1:null }, debug:{lastMi:null,lastSt:null},
 };
 function netAvailable(){ return !!(window.storage && window.RTCPeerConnection); }
 function netStatus(t){ const el=document.getElementById('netStatus'); if(el) el.textContent=t; }
@@ -801,6 +789,7 @@ function netClose(){
   NET.connected=false; NET.role=null;
   NET.gmap={}; NET.rs={}; NET.mTarget=null; NET.target={b:null, m0:null, m1:null};
   NET.miSeq=0; NET.miAck=-1; NET.stSeq=0; NET.lastStateSeq=-1; NET.lastLocalMove=0;
+  NET.debug={lastMi:null,lastSt:null};
 }
 /* --- サーバー中継モード --- */
 function wsConnect(url, onopen){
@@ -1159,6 +1148,7 @@ function hostMsg(m){
     if(q<=NET.miAck || !Number.isFinite(m.u) || !Number.isFinite(m.v)) return;
     NET.miAck=q;
     NET.mTarget={x:(1-m.u)*W, y:(1-m.v)*H};
+    NET.debug.lastMi={u:m.u,v:m.v,x:NET.mTarget.x,y:NET.mTarget.y,at:performance.now()};
     return;
   }
   if(m.c==='bm'){ fireBeam(1, (1-m.u)*W, (1-m.v)*H); return; }
@@ -1176,20 +1166,27 @@ function hostMsg(m){
   }
 }
 function netHostFrame(dt){
-  // ゲストのマレットを物理演算より先に、飛び越しが起きない速度で追従させる。
+  // 受信したゲスト位置へこのフレーム内で到達させる。
+  // 経路を接触半径より細かく刻み、速いドラッグでも球を飛び越さないようにする。
   if(NET.mTarget){
-    const m=P[1].mallet;
+    const p=P[1], m=p.mallet;
     const nx=Math.max(sideW+m.r, Math.min(W-sideW-m.r, NET.mTarget.x));
     const ny=Math.max(wallT+m.r,  Math.min(midY()-m.r,  NET.mTarget.y));
     const ox2=m.x, oy2=m.y;
     const dx=nx-m.x, dy=ny-m.y, d=Math.hypot(dx,dy);
-    const wanted=d*(1-Math.exp(-NET_MALLET_RATE*dt));
-    const step=Math.min(d, wanted, NET_MALLET_MAX_SPD*dt);
-    if(d>1e-6){ m.x+=dx/d*step; m.y+=dy/d*step; }
-    if(dt>0){
-      // 衝突判定が使う速度と、このフレームで実際に動いた距離を一致させる。
-      m.vx=(m.x-ox2)/dt;
-      m.vy=(m.y-oy2)/dt;
+    if(d>1e-6 && dt>0){
+      const steps=Math.max(1,Math.ceil(d/14));
+      m.vx=dx/dt; m.vy=dy/dt;
+      let sounded=false;
+      for(let i=1;i<=steps;i++){
+        m.x=ox2+dx*i/steps; m.y=oy2+dy*i/steps;
+        if(goalPauseT<=0){
+          if(servePlayer===1){ sounded=resolveMalletBall(p,true,!sounded)||sounded; }
+          else if(servePlayer<0){ sounded=resolveMalletBall(p,false,!sounded)||sounded; }
+        }
+      }
+    } else {
+      m.x=nx; m.y=ny; m.vx=0; m.vy=0;
     }
   }
 }
@@ -1253,6 +1250,7 @@ function guestState(m){
   NET.target.b=[(1-m.b[0])*W, (1-m.b[1])*H, -m.b[2]*W, -m.b[3]*H];
   NET.target.m1=[(1-m.m[0][0])*W, (1-m.m[0][1])*H]; // ホストP0＝表示P1
   NET.target.m0=[(1-m.m[1][0])*W, (1-m.m[1][1])*H, m.ack]; // ホストP1＝表示P0（自分の権威位置）
+  NET.debug.lastSt={remoteY:NET.target.m1[1],selfY:NET.target.m0[1],at:performance.now()};
   for(let o=0;o<2;o++){
     const d=1-o;
     P[d].en=m.en[o];
@@ -1319,11 +1317,8 @@ function guestUpdate(dt){
   }
   if(B.m1){
     const m=P[1].mallet;
-    if(dist(m.x,m.y,B.m1[0],B.m1[1]) > 90){ m.x=B.m1[0]; m.y=B.m1[1]; }
-    else {
-      m.x += (B.m1[0]-m.x)*Math.min(1, dt*16);
-      m.y += (B.m1[1]-m.y)*Math.min(1, dt*16);
-    }
+    // 相手マレットはホストの権威座標をそのまま表示する。軸ごとの見かけの差を作らない。
+    m.x=B.m1[0]; m.y=B.m1[1];
   }
   if(B.m0 && !localMalletDragging() && performance.now()-NET.lastLocalMove>120){
     // 操作中はローカル予測を優先し、指を離した後にホスト権威位置へ収束させる。
@@ -1467,6 +1462,7 @@ function startGame(m){
   NET.rs={}; NET.gmap={}; NET.mTarget=null;
   NET.lastHp=[3,3]; NET.lastSc=[0,0]; NET.target={b:null, m0:null, m1:null};
   NET.miSeq=0; NET.miAck=-1; NET.stSeq=0; NET.lastStateSeq=-1; NET.lastLocalMove=0;
+  NET.debug={lastMi:null,lastSt:null};
   phase='play';
   document.getElementById('btnAgain').style.display='';
   document.getElementById('menu').hidden=true;
@@ -1876,6 +1872,29 @@ function render(){
       x.font='700 11px ui-monospace, Menlo, monospace';
       x.fillText('×'+hs.toFixed(1), W/2, my+36);
     }
+  }
+  if(NET_DEBUG && (mode==='net-host' || mode==='net-guest')){
+    const age=v=>v ? Math.round(performance.now()-v.at) : -1;
+    const rows=[
+      `DEBUG ${mode}  PROTO ${PROTO}`,
+      `VIEW ${VW}x${VH}  SC ${SC.toFixed(3)}  O ${OX.toFixed(1)},${OY.toFixed(1)}`,
+      `YOU  ${P[0].mallet.x.toFixed(1)},${P[0].mallet.y.toFixed(1)}`,
+      `OPP  ${P[1].mallet.x.toFixed(1)},${P[1].mallet.y.toFixed(1)}`,
+      `BALL ${ball.x.toFixed(1)},${ball.y.toFixed(1)}`
+    ];
+    if(mode==='net-host'){
+      const d=NET.debug.lastMi;
+      rows.push(d ? `MI v=${d.v.toFixed(4)} -> y=${d.y.toFixed(1)} age=${age(d)}ms` : 'MI waiting');
+    } else {
+      const d=NET.debug.lastSt;
+      rows.push(d ? `ST oppY=${d.remoteY.toFixed(1)} selfY=${d.selfY.toFixed(1)} age=${age(d)}ms` : 'ST waiting');
+    }
+    x.save();
+    x.globalAlpha=0.88; x.fillStyle=BG; x.fillRect(6,42,W-12,rows.length*14+8);
+    x.globalAlpha=1; x.strokeStyle=RED; x.lineWidth=1; x.strokeRect(6.5,42.5,W-13,rows.length*14+7);
+    x.fillStyle=RED; x.font='700 10px ui-monospace, Menlo, monospace'; x.textAlign='left';
+    rows.forEach((r,i)=>x.fillText(r,12,56+i*14));
+    x.restore();
   }
   x.textAlign='start';
 }
