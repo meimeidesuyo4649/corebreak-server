@@ -224,7 +224,7 @@ let fieldLocked=false; // 試合中はフィールド寸法を固定し、表示
 const AR_MAX=0.60, AR_MIN=0.42; // フィールドの縦横比（幅/高さ）の許容範囲＝スマホ基準
 const FIELD_H_MAX=860;          // 論理高さの上限。大画面でも盤面はスマホ大に保つ
 const NET_W=420, NET_H=860;     // オンライン対戦は両者この寸法で固定（幾何を完全一致させる）
-const PROTO=4;                  // 通信プロトコル版。食い違うと当たり判定がズレるため照合する
+const PROTO=5;                  // 通信プロトコル版。食い違うと当たり判定がズレるため照合する
 const NET_DEBUG=new URLSearchParams(location.search).has('debug');
 function fitView(){
   SC = Math.min(VW/W, VH/H, 1);   // 拡大はしない（大画面で巨大化させない）
@@ -762,7 +762,7 @@ const NET={
   rs:{},              // ゲスト側：id→表示用ストローク
   mTarget:null,       // ホスト側：ゲストのマレット目標（ホスト座標）
   sendAcc:0, mAcc:0, miSeq:0, miAck:-1, stSeq:0, lastStateSeq:-1, lastLocalMove:0,
-  poll:null, code:null,
+  poll:null, code:null, handshake:null, handshakeN:0,
   lastHp:[3,3], lastSc:[0,0],
   target:{ b:null, m0:null, m1:null }, debug:{lastMi:null,lastSt:null},
 };
@@ -781,7 +781,42 @@ function netSendU(o){
     if(ch && ch.readyState==='open') ch.send(JSON.stringify(o));
   }catch(_){}
 }
+function clearHandshake(){
+  if(NET.handshake){ clearInterval(NET.handshake); NET.handshake=null; }
+  NET.handshakeN=0;
+}
+function sendGuestReady(){
+  if(NET.role!=='guest' || (phase==='play' && mode==='net-guest')) return;
+  netSendR({c:'rd',v:PROTO});
+}
+function beginGuestReady(){
+  NET.connected=true;
+  netStatus('接続しました。ホストと開始を確認中…');
+  if(NET.handshake) return;
+  NET.handshakeN=0;
+  NET.handshake=setInterval(()=>{
+    if(NET.role!=='guest' || (phase==='play' && mode==='net-guest')){ clearHandshake(); return; }
+    sendGuestReady();
+    if(++NET.handshakeN>=60){
+      clearHandshake();
+      netStatus('開始合図を確認できません。両方のページを再読み込みしてください');
+    }
+  },350);
+  sendGuestReady();
+}
+function beginHostGame(){
+  NET.connected=true;
+  if(!(phase==='play' && mode==='net-host')) startGame('net-host');
+  clearHandshake();
+  const sendGo=()=>netSendR({c:'go',v:PROTO});
+  NET.handshake=setInterval(()=>{
+    sendGo();
+    if(++NET.handshakeN>=30) clearHandshake();
+  },350);
+  sendGo();
+}
 function netClose(){
+  clearHandshake();
   try{ if(NET.pc) NET.pc.close(); }catch(_){}
   try{ if(NET.ws){ NET.ws.onclose=null; NET.ws.close(); } }catch(_){}
   if(NET.poll){ clearInterval(NET.poll); NET.poll=null; }
@@ -835,8 +870,8 @@ function wsMsg(m){
   if(m.t==='paired'){
     NET.connected=true;
     NET.role = m.you==='host' ? 'host' : 'guest';
-    if(NET.role==='host'){ netSendR({c:'go', v:PROTO}); startGame('net-host'); }
-    else netStatus('接続しました。開始を待っています…');
+    if(NET.role==='host') netGo();
+    else beginGuestReady();
     return;
   }
   if(m.t==='lobby'){ renderLobby(m.list, m.online); return; }
@@ -1012,7 +1047,10 @@ async function buildHostPc(){
 function guestPcSetup(pc){
   NET.pc=pc; netWatch(pc);
   pc.ondatachannel=e=>{
-    if(e.channel.label==='r'){ NET.chR=e.channel; }
+    if(e.channel.label==='r'){
+      NET.chR=e.channel;
+      e.channel.onopen=()=>{ if(NET.role==='guest') beginGuestReady(); };
+    }
     else { NET.chU=e.channel; }
     wireChannel(e.channel);
   };
@@ -1124,18 +1162,49 @@ function netGo(){
     rmKey('cbroom-'+NET.code+'-answer');
   }
   const mb=document.getElementById('manualBox'); if(mb) mb.hidden=true;
-  netSendR({c:'go', v:PROTO});
-  startGame('net-host');
+  netStatus('接続しました。相手の準備を確認中…');
+  netSendR({c:'hr',v:PROTO});
 }
 function netOnMsg(m){
+  if(m.c==='hr'){
+    if(NET.role==='guest'){
+      if(m.v!==PROTO){ netStatus('相手とバージョンが違います。両者ともページを再読み込みしてください'); return; }
+      beginGuestReady();
+      sendGuestReady();
+    }
+    return;
+  }
+  if(m.c==='rd'){
+    if(NET.role==='host'){
+      if(m.v!==PROTO){
+        netSendR({c:'bad',v:PROTO});
+        netStatus('相手とバージョンが違います。両者ともページを再読み込みしてください');
+        return;
+      }
+      beginHostGame();
+    }
+    return;
+  }
   if(m.c==='go'){
-    if(NET.role==='guest' && mode!=='net-guest'){
+    if(NET.role==='guest'){
       if(m.v!==PROTO){
         netStatus('相手とバージョンが違います。両者ともページを再読み込みしてください');
         return;
       }
-      NET.connected=true; startGame('net-guest');
+      clearHandshake();
+      NET.connected=true;
+      if(!(phase==='play' && mode==='net-guest')) startGame('net-guest');
+      netSendR({c:'ga',v:PROTO});
     }
+    return;
+  }
+  if(m.c==='ga'){
+    if(NET.role==='host' && m.v===PROTO) clearHandshake();
+    return;
+  }
+  if(m.c==='bad'){
+    clearHandshake();
+    netStatus('相手とバージョンが違います。両者ともページを再読み込みしてください');
     return;
   }
   if(NET.role==='host') hostMsg(m); else guestMsg(m);
