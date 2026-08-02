@@ -224,7 +224,7 @@ let fieldLocked=false; // 試合中はフィールド寸法を固定し、表示
 const AR_MAX=0.60, AR_MIN=0.42; // フィールドの縦横比（幅/高さ）の許容範囲＝スマホ基準
 const FIELD_H_MAX=860;          // 論理高さの上限。大画面でも盤面はスマホ大に保つ
 const NET_W=420, NET_H=860;     // オンライン対戦は両者この寸法で固定（幾何を完全一致させる）
-const PROTO=6;                  // 通信プロトコル版。食い違うと当たり判定がズレるため照合する
+const PROTO=7;                  // 通信プロトコル版。食い違うと当たり判定がズレるため照合する
 const NET_DEBUG=new URLSearchParams(location.search).has('debug');
 function fitView(){
   SC = Math.min(VW/W, VH/H, 1);   // 拡大はしない（大画面で巨大化させない）
@@ -1389,13 +1389,9 @@ function guestUpdate(dt){
     // 相手マレットはホストの権威座標をそのまま表示する。軸ごとの見かけの差を作らない。
     m.x=B.m1[0]; m.y=B.m1[1];
   }
-  if(B.m0 && !localMalletDragging() && performance.now()-NET.lastLocalMove>300){
-    // ホストは受信位置へ即時反映するため、通常の小さな差は補間しない。
-    // 補間した座標を再送するフィードバックを避け、重大な同期外れだけを復旧する。
-    const m=P[0].mallet;
-    const d=dist(m.x,m.y,B.m0[0],B.m0[1]);
-    if(d>140){ m.x=B.m0[0]; m.y=B.m0[1]; m.vx=0; m.vy=0; }
-  }
+  // P[0]（参加側自身）はローカル入力だけで動かす。
+  // ホストから返るm[1]は通信遅延を含むため、ここで表示位置へ適用すると
+  // 指を離した後に過去の移動が再生される。B.m0は診断表示のみに使う。
   liveT+=dt; // 線フェード表示用（厳密でなくてよい）
   for(const p of P){ if(p.flashT>0) p.flashT-=dt; }
   for(const f of flashes) f.life-=dt;
