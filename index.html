@@ -1,0 +1,1858 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>COREBREAK</title>
+<style>
+  :root{ --ink:#141414; --bg:#F6F6F3; --red:#D93025; }
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; overflow:hidden; overscroll-behavior:none; background:var(--bg); }
+  body{ font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color:var(--ink); }
+  canvas{ display:block; touch-action:none; }
+  .ov{
+    position:fixed; inset:0; background:var(--bg);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:18px; padding:24px; text-align:center; z-index:10;
+  }
+  .ov[hidden]{ display:none; }
+  h1{
+    font-size:clamp(30px, 9vw, 54px); letter-spacing:.14em; font-weight:800;
+    position:relative; line-height:1;
+  }
+  h1 .strike{
+    position:absolute; left:-6%; right:-6%; top:52%; height:2px; background:var(--ink);
+    transform:rotate(-2deg);
+  }
+  h1 .hole{
+    position:absolute; top:calc(52% - 4px); left:62%; width:26px; height:10px; background:var(--bg);
+  }
+  .sub{ font-size:13px; letter-spacing:.3em; }
+  .strike .dot{
+    position:absolute; top:-4px; left:2%; width:10px; height:10px; border-radius:50%;
+    background:var(--ink); animation:roll 2.6s ease-in-out infinite alternate;
+  }
+  @keyframes roll{ from{ left:2%; } to{ left:90%; } }
+  .modes{ display:flex; flex-direction:column; gap:12px; width:min(340px, 88vw); }
+  .mode{
+    font:inherit; text-align:left; background:var(--bg); color:var(--ink);
+    border:2px solid var(--ink); padding:14px 18px; cursor:pointer;
+    display:flex; flex-direction:column; gap:4px;
+  }
+  .mode:active{ background:var(--ink); color:var(--bg); }
+  .mode.primary{ background:var(--ink); color:var(--bg); }
+  .mode.primary:active{ background:var(--bg); color:var(--ink); }
+  .mName{ font-weight:800; letter-spacing:.12em; font-size:16px; }
+  .mDesc{ font-size:11px; letter-spacing:.06em; opacity:.62; }
+  .badge{
+    font-size:10px; letter-spacing:.1em; border:1px solid currentColor;
+    padding:1px 6px; margin-left:6px; vertical-align:2px;
+  }
+  .rulesBox{ width:min(340px, 88vw); border:1px solid var(--ink); }
+  .rulesBox summary{
+    cursor:pointer; padding:10px 16px; font-weight:700; letter-spacing:.2em; font-size:13px;
+    list-style:none;
+  }
+  .rulesBox summary::-webkit-details-marker{ display:none; }
+  .rulesBox summary::before{ content:'+ '; }
+  .rulesBox[open] summary::before{ content:'− '; }
+  .rules{
+    font-size:12.5px; line-height:2.1; text-align:left;
+    padding:0 16px 14px;
+  }
+  .rules b{ font-weight:800; }
+  .ver{ font-size:10px; color:#999; letter-spacing:.2em; }
+  .onlinePanel{ display:flex; flex-direction:column; gap:10px; width:min(340px, 88vw); }
+  .joinRow{ display:flex; gap:8px; }
+  .joinRow input{
+    flex:1; min-width:0; font:inherit; font-size:18px; letter-spacing:.3em; text-align:center;
+    border:2px solid var(--ink); background:var(--bg); color:var(--ink); padding:10px;
+  }
+  .joinRow input:focus{ outline:none; background:#fff; }
+  .joinRow button{
+    font:inherit; font-weight:700; letter-spacing:.15em; font-size:14px;
+    background:var(--ink); color:var(--bg); border:2px solid var(--ink);
+    padding:10px 20px; cursor:pointer;
+  }
+  .joinBtn{
+    font:inherit; font-weight:700; font-size:13px; letter-spacing:.12em;
+    border:2px solid var(--ink); background:var(--bg); color:var(--ink);
+    padding:9px; cursor:pointer;
+  }
+  .joinBtn:active{ background:var(--ink); color:var(--bg); }
+  .manualBox{ display:flex; flex-direction:column; gap:8px; }
+  .manualBox[hidden]{ display:none; }
+  .manualBox textarea{
+    font:11px ui-monospace, Menlo, monospace; height:64px; resize:none;
+    border:2px solid var(--ink); background:#fff; color:var(--ink); padding:8px; width:100%;
+  }
+  .srvInput{
+    font:13px ui-monospace, Menlo, monospace; width:100%;
+    border:2px solid var(--ink); background:#fff; color:var(--ink); padding:10px;
+  }
+  .srvInput:focus{ outline:none; }
+  .scrTitle{ font-size:22px; font-weight:800; letter-spacing:.2em; }
+  .lobbyWrap{ display:flex; flex-direction:column; gap:10px; width:min(340px,88vw); }
+  .lobbyBar{ display:flex; gap:8px; align-items:center; }
+  .lobbyBar input{
+    flex:1; min-width:0; font:inherit; font-size:14px;
+    border:2px solid var(--ink); background:#fff; color:var(--ink); padding:9px;
+  }
+  .lobbyBar input:focus{ outline:none; }
+  .onlineCnt{ font-size:11px; letter-spacing:.08em; color:#777; white-space:nowrap; }
+  .listHead{ font-size:11px; letter-spacing:.24em; color:#777; text-align:left; }
+  .lobbyList{
+    border:1px solid var(--ink); max-height:34vh; overflow-y:auto;
+    display:flex; flex-direction:column;
+  }
+  .seekRow{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:12px 14px; border-bottom:1px solid #E2E2DD; background:var(--bg);
+    font:inherit; color:var(--ink); cursor:pointer; text-align:left; border-left:0; border-right:0; border-top:0;
+  }
+  .seekRow:last-child{ border-bottom:0; }
+  .seekRow:active{ background:var(--ink); color:var(--bg); }
+  .seekRow .sName{ font-weight:700; font-size:14px; letter-spacing:.06em; }
+  .seekRow .sMeta{ font-size:10px; letter-spacing:.08em; opacity:.6; }
+  .seekRow .sGo{ font-size:11px; font-weight:700; letter-spacing:.12em; border:1px solid currentColor; padding:3px 9px; }
+  .seekRow.mine{ cursor:default; }
+  .seekRow.mine:active{ background:var(--bg); color:var(--ink); }
+  .empty{ padding:18px 14px; font-size:11px; color:#999; letter-spacing:.08em; }
+  .btns{ display:flex; gap:14px; flex-wrap:wrap; justify-content:center; }
+  button{
+    font:inherit; font-weight:700; letter-spacing:.15em; font-size:15px;
+    background:var(--bg); color:var(--ink); border:2px solid var(--ink);
+    padding:14px 26px; cursor:pointer;
+  }
+  button:active{ background:var(--ink); color:var(--bg); }
+  button.primary{ background:var(--ink); color:var(--bg); }
+  button.primary:active{ background:var(--bg); color:var(--ink); }
+  #resultLine{ font-size:15px; letter-spacing:.1em; line-height:1.9; }
+  #winner{ font-size:clamp(24px,7vw,40px); font-weight:800; letter-spacing:.12em; }
+  .note{ font-size:11px; color:#777; letter-spacing:.08em; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="ov" id="menu">
+  <h1>COREBREAK<span class="strike"><span class="dot"></span></span><span class="hole"></span></h1>
+  <div class="sub">線を引け。芯を撃て。</div>
+  <div class="modes">
+    <button class="mode primary" id="btnAI">
+      <span class="mName">AIと対戦</span>
+      <span class="mDesc">CPU相手のシングルマッチ</span>
+    </button>
+    <button class="mode" id="btnOnline">
+      <span class="mName">オンライン対戦</span>
+      <span class="mDesc">部屋コードを共有して1対1</span>
+    </button>
+    <button class="mode" id="btn2P">
+      <span class="mName">2人で対戦</span>
+      <span class="mDesc">1台の画面を上下で分け合うローカル戦</span>
+    </button>
+  </div>
+  <details class="rulesBox">
+    <summary>遊び方</summary>
+    <div class="rules">
+      <b>輪をドラッグ</b>＝マレットで球を打つ。<b>マレットが本体</b>（HP3）。<b>3秒静止でHP-1</b><br>
+      <b>なぞる</b>＝自陣に壁を引く（インク消費）。線は<b>数秒で消える</b><br>
+      <b>タップ</b>＝マレットからビーム。敵の壁を穿ち、敵マレットに当てればHP減<br>
+      <b>球を線で囲う</b>＝閉じ込め。ただし維持中は無防備、檻は自壊する<br>
+      <b>ゴール +1</b>、90秒の得点勝負。ただし<b>敵マレットのHPを削り切れば即勝利</b><br>
+      ゴールが無い時間が続くと<b>球が加速</b>（ゴールでリセット）<br>
+      球の押さえ込み・膠着は<b>RESET</b>：相手ボールで再開
+    </div>
+  </details>
+  <div class="ver">v1.1</div>
+</div>
+
+<div class="ov" id="online" hidden>
+  <h2 class="scrTitle">ロビー</h2>
+  <div class="lobbyWrap">
+    <div class="lobbyBar">
+      <input id="myName" maxlength="12" placeholder="表示名（一覧に出る名前）">
+      <span class="onlineCnt" id="onlineCnt">接続中…</span>
+    </div>
+    <button class="mode primary" id="btnSeek">
+      <span class="mName">対戦相手をさがす</span>
+      <span class="mDesc">募集を出して待つ。相手が来たら即開始</span>
+    </button>
+    <div class="listHead">募集中の対戦</div>
+    <div class="lobbyList" id="lobbyList"><div class="empty">読み込み中…</div></div>
+    <div class="note" id="netStatus"></div>
+    <details class="rulesBox">
+      <summary>コードで直接つなぐ</summary>
+      <div class="rules">
+        <div class="joinRow" style="margin-bottom:8px">
+          <input id="joinCode" inputmode="numeric" maxlength="4" placeholder="4桁コード">
+          <button id="btnJoin">参加</button>
+        </div>
+        <button class="joinBtn" id="btnHost" style="width:100%">部屋を作って4桁コードを発行</button>
+        <input id="srvUrl" class="srvInput" style="margin-top:8px" placeholder="サーバーURL">
+        <button class="joinBtn" id="btnWake" style="margin-top:8px; width:100%">サーバーを起こす</button>
+        <button class="joinBtn" id="btnManual" style="margin-top:8px; width:100%">サーバー無しで接続</button>
+        <div class="manualBox" id="manualBox" hidden style="margin-top:8px">
+          <div class="note" id="manualHint"></div>
+          <textarea id="codeOut" readonly placeholder="ここにあなたの接続コードが表示されます"></textarea>
+          <button class="joinBtn" id="btnCopy">上のコードをコピー</button>
+          <textarea id="codeIn" placeholder="相手から届いた接続コードをここに貼り付け"></textarea>
+          <button class="joinBtn" id="btnManualNext">貼り付けたコードで接続</button>
+        </div>
+      </div>
+    </details>
+  </div>
+  <button class="joinBtn" id="btnBack" style="width:min(340px,88vw)">← もどる</button>
+</div>
+
+<div class="ov" id="over" hidden>
+  <div id="winner"></div>
+  <div id="resultLine"></div>
+  <div class="btns">
+    <button class="primary" id="btnAgain">もう一度</button>
+    <button id="btnMenu">メニュー</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= 基本セットアップ ================= */
+const cv = document.getElementById('c');
+const x  = cv.getContext('2d');
+let W=0, H=0, VW=0, VH=0, DPR=1, SC=1, OX=0, OY=0;
+let fieldLocked=false; // 試合中はフィールド寸法を固定し、表示だけ縮尺する
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  VW = window.innerWidth; VH = window.innerHeight;
+  cv.width = VW*DPR; cv.height = VH*DPR;
+  cv.style.width = VW+'px'; cv.style.height = VH+'px';
+  if(!fieldLocked){ W=VW; H=VH; }
+  SC = Math.min(VW/W, VH/H);
+  OX = (VW - W*SC)/2;
+  OY = (VH - H*SC)/2;
+}
+addEventListener('resize', resize); resize();
+if(window.visualViewport) window.visualViewport.addEventListener('resize', resize);
+function toF(e){ return { x:(e.clientX-OX)/SC, y:(e.clientY-OY)/SC }; }
+
+const INK='#141414', BG='#F6F6F3', RED='#D93025', FADE='#C9C9C4';
+
+/* ================= 定数 ================= */
+const DRAW_COST = 0.12;   // インク: px あたり
+const BEAM_COST = 25;
+const BEAM_SPD  = 380;  // ビーム弾速（px/s）
+const LINE_LIFE = 2.5;  // 線の寿命（秒）。末尾0.6秒はフェード
+const IDLE_MAX  = 3.0;  // マレット静止でHPが削れるまでの秒数
+const IDLE_MOVE = 22;   // 「動いた」とみなす移動量（px）
+const HEAT_RATE = 0.02; // 加熱：ゴール無し1秒ごとに+2%
+const HEAT_MAX  = 1.6;  // 加熱上限（=+60%）
+const CRUISE    = 200;  // 球の巡航速度の基準（加熱で底上げされる）
+const REGEN     = 9;      // /s
+const HITGAIN   = 5;      // 自分の線が球を弾いた時
+const CAGE_DRAIN= 16;     // /s
+const CAGE_MAX  = 4.0;    // 檻の寿命
+const SEG_HP    = 2;
+const INK_MAX   = 46;   // 場に置ける線分数の上限（≒460px）。超過で古い線から消える
+const BALL_R    = 9;
+const SERVE_SPD = 230;
+const MAX_SPD   = 480;
+const GAME_TIME = 90;
+
+const wallT = 16, sideW = 10;
+const mouthHalf = ()=> Math.min(W*0.24, 110);
+const midY = ()=> H/2;
+
+/* ================= 状態 ================= */
+let phase='menu', mode='ai', T=GAME_TIME;
+let goalPauseT=0, servePlayer=-1, serveWaitT=0, pendingServe=0, stallT=0, stallX=0, stallY=0, liveT=0, heatT=0;
+function heat(){ return Math.min(HEAT_MAX, 1 + HEAT_RATE*heatT); }
+let ball={x:0,y:0,vx:0,vy:0};
+let beams=[], flashes=[], floats=[];
+let P=[];
+
+function mkPlayer(side){
+  const my0 = side ? wallT+90 : H-wallT-90;
+  return { side, score:0, hp:3, en:100,
+           strokes:[], cage:null, cageT:0, lock:false, flashT:0,
+           idleT:0, iax:W/2, iay:my0,
+           mallet:{ x:W/2, y:my0, vx:0, vy:0, r:22 } };
+}
+
+/* ================= 音 ================= */
+let AC=null;
+function initAudio(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } }
+function beep(f, d, type, g){
+  if(!AC) return;
+  try{
+    const o=AC.createOscillator(), ga=AC.createGain();
+    o.type=type||'square'; o.frequency.value=f;
+    ga.gain.value=g||0.035;
+    o.connect(ga); ga.connect(AC.destination);
+    o.start();
+    ga.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime+d);
+    o.frequency.exponentialRampToValueAtTime(Math.max(40,f*0.7), AC.currentTime+d);
+    o.stop(AC.currentTime+d);
+  }catch(e){}
+}
+
+/* ================= 幾何ユーティリティ ================= */
+function dist(ax,ay,bx,by){ return Math.hypot(bx-ax, by-ay); }
+function raySeg(ox,oy,dx,dy, ax,ay,bx,by){
+  const sx=bx-ax, sy=by-ay;
+  const den = dx*sy - dy*sx;
+  if(Math.abs(den) < 1e-9) return Infinity;
+  const t = ((ax-ox)*sy - (ay-oy)*sx)/den;
+  const u = ((ax-ox)*dy - (ay-oy)*dx)/den;
+  return (t>0 && u>=0 && u<=1) ? t : Infinity;
+}
+function rayCircle(ox,oy,dx,dy, cx,cy,r){
+  const fx=ox-cx, fy=oy-cy;
+  const b = fx*dx + fy*dy;
+  const c = fx*fx + fy*fy - r*r;
+  const disc = b*b - c;
+  if(disc < 0) return Infinity;
+  const t = -b - Math.sqrt(disc);
+  return t>0 ? t : Infinity;
+}
+function pointInPoly(px,py,pts){
+  let inside=false;
+  for(let i=0,j=pts.length-1;i<pts.length;j=i++){
+    const xi=pts[i].x, yi=pts[i].y, xj=pts[j].x, yj=pts[j].y;
+    if(((yi>py)!==(yj>py)) && (px < (xj-xi)*(py-yi)/(yj-yi)+xi)) inside=!inside;
+  }
+  return inside;
+}
+function polyArea(pts){
+  let a=0;
+  for(let i=0,j=pts.length-1;i<pts.length;j=i++)
+    a += (pts[j].x+pts[i].x)*(pts[j].y-pts[i].y);
+  return Math.abs(a/2);
+}
+function fold(v,min,max){
+  const L=max-min; if(L<=0) return min;
+  let m=(v-min)%(2*L); if(m<0) m+=2*L;
+  return m<L ? min+m : max-(m-L);
+}
+
+/* ================= ストローク ================= */
+function newStroke(owner){
+  const s={ owner, pts:[], segs:[], closed:false, done:false, nid:++NET.seq };
+  P[owner].strokes.push(s);
+  if(mode==='net-host') netSendR({c:'ss', o:owner, id:s.nid});
+  return s;
+}
+function aliveSegCount(p){
+  let n=0;
+  for(const st of p.strokes) for(const sg of st.segs) if(sg.alive) n++;
+  return n;
+}
+function enforceInkCap(p, cur){
+  let n=aliveSegCount(p);
+  if(n<=INK_MAX) return;
+  // 古いストロークの古い線分から消す（描画中のストロークは最後）
+  for(const st of p.strokes){
+    if(st===cur) continue;
+    for(const sg of st.segs){
+      if(!sg.alive) continue;
+      sg.alive=false; n--;
+      if(n<=INK_MAX) return;
+    }
+  }
+  for(const sg of cur.segs){
+    if(!sg.alive) continue;
+    sg.alive=false; n--;
+    if(n<=INK_MAX) return;
+  }
+}
+function addPoint(owner, stroke, nx, ny){
+  const p=P[owner];
+  if(goalPauseT>0 || servePlayer>=0) return false; // 試合が動いている間だけ線を引ける
+  // 自陣クランプ
+  nx = Math.max(sideW+4, Math.min(W-sideW-4, nx));
+  if(owner===0) ny = Math.max(midY()+6, Math.min(H-wallT-8, ny));
+  else          ny = Math.max(wallT+8,  Math.min(midY()-6, ny));
+  if(stroke.pts.length===0){ stroke.pts.push({x:nx,y:ny}); return true; }
+  const last=stroke.pts[stroke.pts.length-1];
+  const d=dist(last.x,last.y,nx,ny);
+  if(d < 9) return true;
+  const cost=d*DRAW_COST;
+  if(p.en < cost) return false; // インク切れ
+  p.en -= cost;
+  stroke.pts.push({x:nx,y:ny});
+  stroke.segs.push({ax:last.x,ay:last.y,bx:nx,by:ny,hp:SEG_HP,alive:true,cool:0,born:liveT});
+  enforceInkCap(p, stroke);
+  if(mode==='net-host') netSendR({c:'sp', o:stroke.owner, id:stroke.nid, u:nx/W, v:ny/H});
+  return true;
+}
+function finalizeStroke(owner, stroke){
+  const p=P[owner];
+  stroke.done=true;
+  if(stroke.segs.length===0){
+    const i=p.strokes.indexOf(stroke); if(i>=0) p.strokes.splice(i,1);
+    if(mode==='net-host') netSendR({c:'se', o:owner, id:stroke.nid, cl:0});
+    return;
+  }
+  const a=stroke.pts[0], b=stroke.pts[stroke.pts.length-1];
+  if(stroke.pts.length>=8 && dist(a.x,a.y,b.x,b.y) < 28){
+    stroke.closed=true;
+    stroke.segs.push({ax:b.x,ay:b.y,bx:a.x,by:a.y,hp:SEG_HP,alive:true,cool:0,born:liveT});
+    // 檻判定
+    if(!p.cage && polyArea(stroke.pts) > 6000 && pointInPoly(ball.x, ball.y, stroke.pts)){
+      p.cage=stroke; p.cageT=0; p.lock=true;
+      beep(160,0.25,'sawtooth',0.05);
+      floats.push({x:ball.x, y:ball.y, txt:'囲', life:1});
+    }
+  }
+  if(mode==='net-host') netSendR({c:'se', o:owner, id:stroke.nid, cl:stroke.closed?1:0});
+}
+function removeStroke(stroke){
+  const p=P[stroke.owner];
+  const i=p.strokes.indexOf(stroke); if(i>=0) p.strokes.splice(i,1);
+}
+function endCage(p, destroy){
+  if(!p.cage) return;
+  if(destroy){
+    const c=p.cage.pts;
+    let cx=0,cy=0; c.forEach(q=>{cx+=q.x;cy+=q.y}); cx/=c.length; cy/=c.length;
+    flashes.push({x:cx,y:cy,r:14,life:0.5,col:INK});
+    removeStroke(p.cage);
+    beep(120,0.3,'sawtooth',0.06);
+  }
+  p.cage=null; p.lock=false;
+}
+
+/* ================= ビーム ================= */
+function fireBeam(owner, tx, ty){
+  const p=P[owner];
+  if(phase!=='play' || goalPauseT>0 || servePlayer>=0 || p.lock || p.en < BEAM_COST) return;
+  const m=p.mallet;
+  let dx=tx-m.x, dy=ty-m.y;
+  const L=Math.hypot(dx,dy);
+  if(L < 6) return;
+  dx/=L; dy/=L;
+  p.en -= BEAM_COST;
+  beams.push({ x:m.x+dx*(m.r+6), y:m.y+dy*(m.r+6), dx, dy, owner });
+  flashes.push({x:m.x+dx*(m.r+6), y:m.y+dy*(m.r+6), r:4, life:0.2, col:INK});
+  beep(880,0.12,'square',0.03);
+}
+function updateShots(dt){
+  for(let i=beams.length-1; i>=0; i--){
+    const s=beams[i];
+    const enemy=P[1-s.owner];
+    let rem=BEAM_SPD*dt, dead=false;
+    while(rem>0 && !dead){
+      const step=Math.min(rem, 8); rem-=step;
+      let bestT=step, hit=null;
+      // 壁
+      if(s.dx<0){ const t=(sideW-s.x)/s.dx;    if(t>=0&&t<bestT){bestT=t;hit={type:'wall'};} }
+      if(s.dx>0){ const t=(W-sideW-s.x)/s.dx;  if(t>=0&&t<bestT){bestT=t;hit={type:'wall'};} }
+      if(s.dy<0){ const t=(wallT-s.y)/s.dy;    if(t>=0&&t<bestT){bestT=t;hit={type:'wall'};} }
+      if(s.dy>0){ const t=(H-wallT-s.y)/s.dy;  if(t>=0&&t<bestT){bestT=t;hit={type:'wall'};} }
+      // 敵の線分（自分の線は素通し）
+      for(const st of enemy.strokes) for(const sg of st.segs){
+        if(!sg.alive) continue;
+        const t=raySeg(s.x,s.y,s.dx,s.dy, sg.ax,sg.ay,sg.bx,sg.by);
+        if(t<bestT){ bestT=t; hit={type:'seg'}; }
+      }
+      // ボール
+      const tb=rayCircle(s.x,s.y,s.dx,s.dy, ball.x,ball.y, BALL_R+3);
+      if(tb<bestT){ bestT=tb; hit={type:'ball'}; }
+      // 敵マレット（＝コア）
+      const em=enemy.mallet;
+      const tm=rayCircle(s.x,s.y,s.dx,s.dy, em.x,em.y, em.r);
+      if(tm<bestT){ bestT=tm; hit={type:'core'}; }
+
+      s.x+=s.dx*bestT; s.y+=s.dy*bestT;
+      if(hit){
+        dead=true;
+        if(hit.type==='seg'){
+          for(const st of enemy.strokes) for(const sg of st.segs){
+            if(!sg.alive) continue;
+            const mx=(sg.ax+sg.bx)/2, my2=(sg.ay+sg.by)/2;
+            if(dist(mx,my2,s.x,s.y) < 20){ sg.alive=false; sg.hp=0; }
+          }
+          flashes.push({x:s.x,y:s.y,r:6,life:0.35,col:INK});
+          beep(300,0.1,'square',0.04);
+        } else if(hit.type==='ball'){
+          ball.vx += s.dx*200; ball.vy += s.dy*200;
+          capSpeed();
+          flashes.push({x:s.x,y:s.y,r:8,life:0.3,col:INK});
+          beep(500,0.08,'triangle',0.05);
+        } else if(hit.type==='core'){
+          damageCore(1-s.owner, s.owner, s.x, s.y);
+        } else {
+          flashes.push({x:s.x,y:s.y,r:4,life:0.2,col:INK});
+        }
+      }
+    }
+    if(dead) beams.splice(i,1);
+  }
+}
+function damageCore(victimIdx, attackerIdx, hx, hy){
+  const v=P[victimIdx];
+  v.hp--; v.flashT=0.6;
+  floats.push({x:hx, y:hy-24, txt:'-1', life:0.9});
+  flashes.push({x:hx,y:hy,r:10,life:0.6,col:RED});
+  beep(110,0.3,'sawtooth',0.07);
+  if(v.hp<=0){
+    flashes.push({x:hx,y:hy,r:24,life:0.9,col:RED});
+    beep(70,0.6,'sawtooth',0.09);
+    endGame('break', attackerIdx); // 破壊＝即決着
+  }
+}
+
+/* ================= ボール ================= */
+function capSpeed(){
+  const cap=MAX_SPD*heat();
+  const s=Math.hypot(ball.vx,ball.vy);
+  if(s>cap){ ball.vx*=cap/s; ball.vy*=cap/s; }
+}
+function setupServe(idx){
+  servePlayer=idx; serveWaitT=0; stallT=0;
+  beams.length=0; // 飛翔中の弾は消す
+  for(const p of P){ p.idleT=0; p.iax=p.mallet.x; p.iay=p.mallet.y; }
+  ball.vx=0; ball.vy=0;
+  ball.x=W/2;
+  ball.y = idx===0 ? midY()+H*0.2 : midY()-H*0.2;
+  stallX=ball.x; stallY=ball.y;
+}
+function serveStrike(){
+  const p=P[servePlayer];
+  const m=p.mallet;
+  const dx=ball.x-m.x, dy=ball.y-m.y;
+  const d=Math.hypot(dx,dy), minD=BALL_R+m.r;
+  if(d < minD && d > 1e-6){
+    const nx=dx/d, ny=dy/d;
+    ball.x=m.x+nx*(minD+0.5); ball.y=m.y+ny*(minD+0.5);
+    ball.vx=m.vx*0.9 + nx*60; ball.vy=m.vy*0.9 + ny*60;
+    const s=Math.hypot(ball.vx,ball.vy);
+    if(s < 160){ ball.vx += nx*(160-s); ball.vy += ny*(160-s); }
+    capSpeed();
+    servePlayer=-1;
+    beep(240,0.06,'triangle',0.05);
+  }
+}
+function scoreGoal(scorerIdx){
+  const s=P[scorerIdx];
+  s.score++;
+  heatT=0; // ゴールで加熱リセット
+  ball.vx=0; ball.vy=0;
+  floats.push({x:W/2, y: scorerIdx===0? wallT+50 : H-wallT-50, txt:'+1 GOAL', life:1.2});
+  flashes.push({x:W/2, y: scorerIdx===0? wallT : H-wallT, r:20, life:0.7, col:INK});
+  beep(660,0.12,'square',0.05); setTimeout(()=>beep(990,0.18,'square',0.05),110);
+  pendingServe = 1-scorerIdx; // 決められた側のボールで再開
+  goalPauseT = 1.1;
+}
+function stepBall(dt){
+  const spd=Math.hypot(ball.vx,ball.vy);
+  const n=Math.max(1, Math.ceil(spd*dt/6));
+  const sdt=dt/n;
+  for(let i=0;i<n;i++){
+    ball.x += ball.vx*sdt;
+    ball.y += ball.vy*sdt;
+    // 側壁
+    if(ball.x < sideW+BALL_R){ ball.x=sideW+BALL_R; ball.vx=Math.abs(ball.vx); beep(220,0.04,'square',0.02); }
+    if(ball.x > W-sideW-BALL_R){ ball.x=W-sideW-BALL_R; ball.vx=-Math.abs(ball.vx); beep(220,0.04,'square',0.02); }
+    // 上端
+    if(ball.y - BALL_R < wallT){
+      if(Math.abs(ball.x - W/2) < mouthHalf()-4){ scoreGoal(0); return; }
+      ball.y=wallT+BALL_R; ball.vy=Math.abs(ball.vy); beep(200,0.04,'square',0.02);
+    }
+    // 下端
+    if(ball.y + BALL_R > H-wallT){
+      if(Math.abs(ball.x - W/2) < mouthHalf()-4){ scoreGoal(1); return; }
+      ball.y=H-wallT-BALL_R; ball.vy=-Math.abs(ball.vy); beep(200,0.04,'square',0.02);
+    }
+    // マレットとの衝突
+    for(const p of P){
+      const m=p.mallet;
+      const dx=ball.x-m.x, dy=ball.y-m.y;
+      const d=Math.hypot(dx,dy), minD=BALL_R+m.r;
+      if(d < minD && d > 1e-6){
+        const nx=dx/d, ny=dy/d;
+        ball.x = m.x + nx*(minD+0.5);
+        ball.y = m.y + ny*(minD+0.5);
+        const rvx=ball.vx-m.vx, rvy=ball.vy-m.vy;
+        const vd=rvx*nx+rvy*ny;
+        if(vd < 0){
+          ball.vx = m.vx*0.8 + (rvx - 2*vd*nx);
+          ball.vy = m.vy*0.8 + (rvy - 2*vd*ny);
+          const s=Math.hypot(ball.vx,ball.vy);
+          if(s < 140){ ball.vx += nx*(140-s); ball.vy += ny*(140-s); }
+          capSpeed();
+          beep(240,0.05,'triangle',0.045);
+        }
+      }
+    }
+    // 線分との衝突
+    const now=performance.now();
+    for(const p of P) for(const st of p.strokes) for(const sg of st.segs){
+      if(!sg.alive) continue;
+      const abx=sg.bx-sg.ax, aby=sg.by-sg.ay;
+      const len2=abx*abx+aby*aby; if(len2<1e-6) continue;
+      let t=((ball.x-sg.ax)*abx + (ball.y-sg.ay)*aby)/len2;
+      t=Math.max(0,Math.min(1,t));
+      const cx=sg.ax+abx*t, cy=sg.ay+aby*t;
+      const dx=ball.x-cx, dy=ball.y-cy;
+      const d=Math.hypot(dx,dy);
+      const rr=BALL_R+2;
+      if(d < rr && d > 1e-6){
+        const nx=dx/d, ny=dy/d;
+        const vd=ball.vx*nx+ball.vy*ny;
+        if(vd < 0){
+          ball.vx -= 2*vd*nx; ball.vy -= 2*vd*ny;
+        }
+        ball.x = cx + nx*(rr+0.5);
+        ball.y = cy + ny*(rr+0.5);
+        if(now - sg.cool > 90){
+          sg.cool=now;
+          // 接触点の周辺をまとめて削る（穴が空く）
+          for(const sg2 of st.segs){
+            if(!sg2.alive) continue;
+            const mx=(sg2.ax+sg2.bx)/2, my2=(sg2.ay+sg2.by)/2;
+            if(dist(mx,my2,cx,cy) < 24){
+              sg2.hp--; sg2.cool=now;
+              if(sg2.hp<=0) sg2.alive=false;
+            }
+          }
+          P[st.owner].en = Math.min(100, P[st.owner].en + HITGAIN);
+          // 檻の中なら加速
+          if(P[st.owner].cage === st){
+            ball.vx*=1.045; ball.vy*=1.045; capSpeed();
+            beep(340,0.05,'square',0.035);
+          } else {
+            beep(280,0.05,'square',0.03);
+          }
+        }
+      }
+    }
+  }
+}
+
+/* ================= AI ================= */
+const ai={t:0, next:0.4};
+function aiTick(dt){
+  ai.t+=dt;
+  if(ai.t < ai.next) return;
+  ai.t=0; ai.next=0.25+Math.random()*0.35;
+  const p=P[1];
+  if(p.lock) return;
+  // 防御：ゴールへ向かう球を予測して短い線を引く
+  if(ball.vy < -40 && ball.y < midY()+120){
+    const ty = wallT+52;
+    const tt = (ball.y - ty)/(-ball.vy);
+    if(tt>0 && tt<2.5){
+      let px = fold(ball.x + ball.vx*tt, sideW+BALL_R, W-sideW-BALL_R);
+      if(Math.abs(px-W/2) < mouthHalf()+60){
+        px += (Math.random()*36-18); // 狙いの粗さ
+        let near=false;
+        for(const st of p.strokes) for(const sg of st.segs){
+          if(sg.alive && dist((sg.ax+sg.bx)/2,(sg.ay+sg.by)/2, px, ty+8) < 55){ near=true; break; }
+        }
+        if(!near && p.en > 26){
+          aiDraw(px, ty + 6 + Math.random()*22, 70+Math.random()*50);
+          return;
+        }
+      }
+    }
+  }
+  // 攻撃：ビーム
+  if(p.en > 55 && Math.random() < 0.4){
+    const em=P[0].mallet;
+    if(Math.random() < 0.6){
+      fireBeam(1, em.x + em.vx*0.6 + (Math.random()*44-22),
+                  em.y + em.vy*0.6 + (Math.random()*44-22));
+    } else if(ball.y > midY()){
+      fireBeam(1, ball.x + (Math.random()*30-15), ball.y);
+    }
+  }
+}
+function aiDraw(cx, cy, len){
+  const p=P[1];
+  const st=newStroke(1);
+  const ang=(Math.random()*0.5-0.25);
+  const steps=Math.floor(len/10);
+  for(let i=0;i<=steps;i++){
+    const t=i/steps - 0.5;
+    const nx=cx + Math.cos(ang)*len*t;
+    const ny=cy + Math.sin(ang)*len*t;
+    if(!addPoint(1, st, nx, ny)) break;
+  }
+  finalizeStroke(1, st);
+}
+function aiMallet(dt){
+  const m=P[1].mallet;
+  const wob=Math.sin(liveT*4.2)*30; // 常時ゆらぎ（静止ペナルティ回避）
+  let tx, ty;
+  if(goalPauseT>0 || servePlayer===0){
+    // 待機：ゴール前へ戻る
+    tx = W/2 + wob; ty = wallT + 90;
+  } else if(servePlayer===1){
+    // 自分のサーブ：上から回り込んで打ち出す
+    tx = ball.x;
+    ty = ball.y - 30;
+    if(m.y > ball.y - 6) ty = ball.y - 46;
+    if(Math.abs(m.x - ball.x) < 14 && m.y < ball.y - 24) ty = ball.y + 10;
+  } else if(ball.y < midY()){
+    const nearTop  = ball.y < wallT + m.r + 44;
+    const nearSide = ball.x < sideW + m.r*2 + 30 || ball.x > W - sideW - m.r*2 - 30;
+    if(nearTop && nearSide){
+      // 角：入るスペースがないので深追いしない（膠着はRESETが処理）
+      tx = W/2 + wob; ty = wallT + 90;
+    } else if(nearTop){
+      // 壁際：押し付けず、横から掻き出す
+      const side = ball.x < W/2 ? -1 : 1;
+      tx = ball.x + side*(m.r + BALL_R + 10);
+      ty = ball.y;
+      if(Math.abs(m.y - ball.y) < 22 && Math.abs(m.x - ball.x) < m.r + BALL_R + 34){
+        tx = ball.x; ty = ball.y; // 中央方向へ弾く
+      }
+    } else {
+      // 攻撃：球の上側（自ゴール側）から回り込んで叩く
+      tx = ball.x;
+      ty = ball.y - 28;
+      if(m.y > ball.y - 4) ty = ball.y - 44;
+    }
+  } else {
+    // 守備：ゴール前で球のxを緩く追う
+    tx = W/2 + (ball.x - W/2)*0.35 + wob;
+    ty = wallT + 80;
+  }
+  tx = Math.max(sideW+m.r, Math.min(W-sideW-m.r, tx));
+  ty = Math.max(wallT+m.r,  Math.min(midY()-m.r,  ty));
+  const dx=tx-m.x, dy=ty-m.y, d=Math.hypot(dx,dy);
+  if(d > 1){
+    const sp = Math.min(430, d*8);
+    m.vx = dx/d*sp; m.vy = dy/d*sp;
+    m.x += m.vx*dt; m.y += m.vy*dt;
+  } else { m.vx=0; m.vy=0; }
+}
+
+/* ================= オンライン対戦（β） =================
+   シグナリング：Artifactの共有ストレージに部屋コードでSDPを置く
+   対戦データ：WebRTC DataChannel（P2P直結）
+   ホスト＝物理演算の権威。ゲストは入力送信＋状態受信で描画 */
+const NET={
+  pc:null, chR:null, chU:null, role:null, connected:false,
+  seq:0, seeking:false, mySeek:null,
+  lobbyWant:false, lobbyUrl:null, retryN:0, t0:0, httpOK:null, blocked:false, sawError:false,
+  gmap:{},            // ホスト側：ゲストのストロークid→stroke実体
+  rs:{},              // ゲスト側：id→表示用ストローク
+  mTarget:null,       // ホスト側：ゲストのマレット目標（ホスト座標）
+  sendAcc:0, mAcc:0,
+  poll:null, code:null,
+  lastHp:[3,3], lastSc:[0,0],
+  target:{ b:null, m1:null },
+};
+function netAvailable(){ return !!(window.storage && window.RTCPeerConnection); }
+function netStatus(t){ const el=document.getElementById('netStatus'); if(el) el.textContent=t; }
+function netSendR(o){
+  try{
+    if(NET.ws && NET.ws.readyState===1){ NET.ws.send(JSON.stringify({t:'m', d:o})); return; }
+    if(NET.chR && NET.chR.readyState==='open') NET.chR.send(JSON.stringify(o));
+  }catch(_){}
+}
+function netSendU(o){
+  try{
+    if(NET.ws && NET.ws.readyState===1){ NET.ws.send(JSON.stringify({t:'m', d:o})); return; }
+    const ch=(NET.chU && NET.chU.readyState==='open') ? NET.chU : NET.chR;
+    if(ch && ch.readyState==='open') ch.send(JSON.stringify(o));
+  }catch(_){}
+}
+function netClose(){
+  try{ if(NET.pc) NET.pc.close(); }catch(_){}
+  try{ if(NET.ws){ NET.ws.onclose=null; NET.ws.close(); } }catch(_){}
+  if(NET.poll){ clearInterval(NET.poll); NET.poll=null; }
+  NET.pc=null; NET.chR=null; NET.chU=null; NET.ws=null;
+  NET.connected=false; NET.role=null;
+  NET.gmap={}; NET.rs={}; NET.mTarget=null; NET.target={b:null, m1:null};
+}
+/* --- サーバー中継モード --- */
+function wsConnect(url, onopen){
+  netClose();
+  url=(url||'').trim();
+  if(!/^wss?:\/\//.test(url)){
+    if(/^https:\/\//.test(url)) url=url.replace(/^https:\/\//,'wss://');
+    else if(/^http:\/\//.test(url)) url=url.replace(/^http:\/\//,'ws://');
+    else url='wss://'+url;
+  }
+  try{
+    const ws=new WebSocket(url);
+    NET.ws=ws;
+    ws.onopen=onopen;
+    ws.onmessage=e=>{ try{ wsMsg(JSON.parse(e.data)); }catch(_){} };
+    ws.onclose=()=>{
+      if(phase==='play' && (mode==='net-host'||mode==='net-guest')) netShowEnd('接続が切れました','');
+      NET.ws=null; NET.connected=false;
+      // ロビー画面を開いている間は自動で再接続（無料サーバーの起動待ち対応）
+      const scr=document.getElementById('online');
+      if(NET.lobbyWant && phase!=='play' && scr && !scr.hidden){
+        setTimeout(()=>tryLobbyConnect(), 4000);
+      }
+    };
+    ws.onerror=()=>{ NET.sawError=true; };
+  }catch(err){
+    NET.blocked=true;
+    netStatus('接続が拒否されました：'+(err&&err.message||err));
+  }
+}
+function wsHost(url){
+  netStatus('サーバーに接続中…');
+  wsConnect(url, ()=>{ NET.ws.send(JSON.stringify({t:'create'})); });
+  NET.role='host'; // wsConnect内のnetCloseの後に設定すること
+}
+function wsJoin(url, code){
+  netStatus('サーバーに接続中…');
+  wsConnect(url, ()=>{ NET.ws.send(JSON.stringify({t:'join', code})); });
+  NET.role='guest'; // 同上
+}
+function wsMsg(m){
+  if(m.t==='room'){ netStatus('部屋コード【 '+m.code+' 】を相手に伝えてください。参加を待っています…'); return; }
+  if(m.t==='paired'){
+    NET.connected=true;
+    NET.role = m.you==='host' ? 'host' : 'guest';
+    if(NET.role==='host'){ netSendR({c:'go'}); startGame('net-host'); }
+    else netStatus('接続しました。開始を待っています…');
+    return;
+  }
+  if(m.t==='lobby'){ renderLobby(m.list, m.online); return; }
+  if(m.t==='seeking'){ NET.seeking=true; NET.mySeek=m.id; updateSeekBtn(); netStatus('募集中… 相手が参加すると自動で始まります'); return; }
+  if(m.t==='unseeked'){ NET.seeking=false; NET.mySeek=null; updateSeekBtn(); netStatus(''); return; }
+  if(m.t==='m'){ netOnMsg(m.d); return; }
+  if(m.t==='err'){ netStatus(m.m); NET.seeking=false; updateSeekBtn(); return; }
+  if(m.t==='peer_left'){
+    if(phase==='play') netShowEnd('相手が退出しました','');
+    else netStatus('相手が退出しました');
+    return;
+  }
+}
+/* --- ロビー --- */
+function myName(){
+  const v=(document.getElementById('myName').value||'').trim();
+  return v || 'ゲスト';
+}
+function updateSeekBtn(){
+  const b=document.getElementById('btnSeek');
+  b.querySelector('.mName').textContent = NET.seeking ? '募集をとりけす' : '対戦相手をさがす';
+  b.querySelector('.mDesc').textContent = NET.seeking ? '相手が来るのを待っています…' : '募集を出して待つ。相手が来たら即開始';
+  b.classList.toggle('primary', !NET.seeking);
+}
+function renderLobby(list, online){
+  const el=document.getElementById('lobbyList');
+  const cnt=document.getElementById('onlineCnt');
+  if(cnt) cnt.textContent = (online||0)+'人がオンライン';
+  el.innerHTML='';
+  const others=list.filter(s=>s.id!==NET.mySeek);
+  if(!list.length){
+    el.innerHTML='<div class="empty">まだ募集がありません。「対戦相手をさがす」で最初の1人になろう</div>';
+    return;
+  }
+  for(const s of list){
+    const mine = s.id===NET.mySeek;
+    const row=document.createElement('button');
+    row.className='seekRow'+(mine?' mine':'');
+    row.innerHTML='<span><span class="sName">'+escapeHtml(s.name)+(mine?'（あなた）':'')+'</span><br>'+
+                  '<span class="sMeta">'+s.w+'秒前から待機</span></span>'+
+                  (mine?'':'<span class="sGo">参加</span>');
+    if(!mine) row.onclick=()=>{ initAudio(); netStatus('参加しています…'); NET.ws && NET.ws.send(JSON.stringify({t:'accept', id:s.id})); };
+    el.appendChild(row);
+  }
+  if(!others.length && list.length){
+    const d=document.createElement('div');
+    d.className='empty'; d.textContent='他の募集を待っています…';
+    el.appendChild(d);
+  }
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function lobbyEnter(){
+  const url=document.getElementById('srvUrl').value.trim() || DEFAULT_WS;
+  if(!url){ netStatus('サーバーURLが設定されていません'); return; }
+  NET.lobbyWant=true; NET.lobbyUrl=url; NET.retryN=0; NET.t0=Date.now(); NET.blocked=false;
+  NET.seeking=false; NET.mySeek=null; updateSeekBtn();
+  document.getElementById('lobbyList').innerHTML='<div class="empty">接続中…</div>';
+  wakePing(url);
+  tryLobbyConnect();
+}
+function wakePing(url){
+  // HTTPで起こす。ここが失敗する場合は通信自体が遮断されている可能性が高い
+  try{
+    let hu=url.replace(/^wss:\/\//,'https://').replace(/^ws:\/\//,'http://');
+    if(!/^https?:\/\//.test(hu)) hu='https://'+hu;
+    fetch(hu, {mode:'no-cors', cache:'no-store'})
+      .then(()=>{ NET.httpOK=true; })
+      .catch(()=>{ NET.httpOK=false; });
+  }catch(_){ NET.httpOK=false; }
+}
+function tryLobbyConnect(){
+  if(!NET.lobbyWant || !NET.lobbyUrl) return;
+  const scr=document.getElementById('online');
+  if(!scr || scr.hidden) return;
+  NET.retryN++;
+  if(NET.retryN > 12){
+    NET.lobbyWant=false;
+    netStatus(NET.httpOK===false
+      ? 'サーバーに届きません。アプリ内表示では外部接続が遮断されます。ブラウザで開いてください'
+      : 'サーバーに接続できませんでした。「対戦相手をさがす」を押すともう一度試します');
+    document.getElementById('lobbyList').innerHTML='<div class="empty">未接続</div>';
+    return;
+  }
+  const el=Math.round((Date.now()-NET.t0)/1000);
+  netStatus(NET.retryN===1
+    ? 'サーバーに接続中…（眠っている場合は起動に最大60秒）'
+    : '接続を再試行しています（'+NET.retryN+'回目・'+el+'秒経過）');
+  wsConnect(NET.lobbyUrl, ()=>{
+    NET.retryN=0;
+    netStatus('');
+    NET.ws.send(JSON.stringify({t:'lobby_in', name:myName()}));
+  });
+  // 応答が無いまま固まるのを防ぐ（Renderの起動待ちで接続がぶら下がるため）
+  const ws=NET.ws;
+  setTimeout(()=>{
+    if(ws && ws.readyState===0 && NET.ws===ws){
+      try{ ws.onclose=null; ws.close(); }catch(_){}
+      NET.ws=null;
+      wakePing(NET.lobbyUrl);
+      tryLobbyConnect();
+    }
+  }, 12000);
+}
+function lobbySeek(){
+  if(!NET.ws || NET.ws.readyState!==1){
+    if(NET.lobbyWant){
+      netStatus('まだサーバーに接続中です。この表示が消えるまでお待ちください');
+    } else {
+      // 接続が切れた/諦めた後でも、ボタンから再接続できるようにする
+      lobbyEnter();
+    }
+    return;
+  }
+  if(NET.seeking){
+    NET.ws.send(JSON.stringify({t:'unseek'}));
+    NET.seeking=false; NET.mySeek=null; updateSeekBtn();
+  } else {
+    NET.ws.send(JSON.stringify({t:'seek'}));
+  }
+}
+async function sdpWait(pc){
+  await new Promise(res=>{
+    if(pc.iceGatheringState==='complete') return res();
+    const to=setTimeout(res, 3500);
+    pc.addEventListener('icegatheringstatechange', ()=>{
+      if(pc.iceGatheringState==='complete'){ clearTimeout(to); res(); }
+    });
+  });
+  return JSON.stringify(pc.localDescription);
+}
+function wireChannel(ch){
+  ch.onmessage=e=>{ try{ netOnMsg(JSON.parse(e.data)); }catch(_){} };
+}
+function netWatch(pc){
+  pc.onconnectionstatechange=()=>{
+    if(['failed','disconnected','closed'].includes(pc.connectionState)){
+      NET.connected=false;
+      if(phase==='play' && (mode==='net-host'||mode==='net-guest')){
+        netShowEnd('接続が切れました','');
+      }
+    }
+  };
+}
+function rmKey(k){ try{ window.storage.delete(k, true).then(()=>{}, ()=>{}); }catch(_){} }
+function enc(desc){ return 'CB1.'+btoa(unescape(encodeURIComponent(JSON.stringify(desc)))); }
+function dec(code){
+  code=(code||'').trim();
+  if(!code.startsWith('CB1.')) throw new Error('コードの形式が違います');
+  return JSON.parse(decodeURIComponent(escape(atob(code.slice(4)))));
+}
+function mh(t){ const el=document.getElementById('manualHint'); if(el) el.textContent=t; }
+function showManual(outCode, hint){
+  const box=document.getElementById('manualBox');
+  box.hidden=false;
+  document.getElementById('codeOut').value=outCode||'';
+  document.getElementById('codeIn').value='';
+  mh(hint);
+}
+async function buildHostPc(){
+  const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+  NET.pc=pc; netWatch(pc);
+  NET.chR=pc.createDataChannel('r');
+  NET.chU=pc.createDataChannel('u', {ordered:false, maxRetransmits:0});
+  wireChannel(NET.chR); wireChannel(NET.chU);
+  NET.chR.onopen=()=>{ if(NET.role==='host' && !NET.connected) netGo(); };
+  const off=await pc.createOffer();
+  await pc.setLocalDescription(off);
+  await sdpWait(pc);
+  return pc;
+}
+function guestPcSetup(pc){
+  NET.pc=pc; netWatch(pc);
+  pc.ondatachannel=e=>{
+    if(e.channel.label==='r'){ NET.chR=e.channel; }
+    else { NET.chU=e.channel; }
+    wireChannel(e.channel);
+  };
+}
+async function hostRoom(){
+  if(!window.RTCPeerConnection){ netStatus('この環境ではオンライン対戦を使えません'); return; }
+  netClose();
+  NET.role='host';
+  netStatus('部屋を準備中…');
+  try{
+    const pc=await buildHostPc();
+    // まず共有ストレージでの自動交換を試す
+    let storageOK=false;
+    if(window.storage){
+      try{
+        NET.code=String(1000+Math.floor(Math.random()*9000));
+        await window.storage.set('cbroom-'+NET.code+'-offer',
+          JSON.stringify({t:Date.now(), sdp:JSON.stringify(pc.localDescription)}), true);
+        storageOK=true;
+      }catch(_){ storageOK=false; NET.code=null; }
+    }
+    if(storageOK){
+      netStatus('部屋コード【 '+NET.code+' 】を相手に伝えてください。参加を待っています…');
+      let tries=0;
+      NET.poll=setInterval(async ()=>{
+        tries++;
+        if(tries>60){
+          clearInterval(NET.poll); NET.poll=null;
+          netStatus('相手が来ませんでした。もう一度お試しください');
+          rmKey('cbroom-'+NET.code+'-offer');
+          netClose(); return;
+        }
+        try{
+          const r=await window.storage.get('cbroom-'+NET.code+'-answer', true);
+          if(r && r.value){
+            clearInterval(NET.poll); NET.poll=null;
+            netStatus('接続中…');
+            await pc.setRemoteDescription(JSON.parse(JSON.parse(r.value).sdp));
+          }
+        }catch(_){ /* まだ応答なし */ }
+      }, 2000);
+    } else {
+      // 手動交換にフォールバック
+      netStatus('この環境では自動交換が使えないため、手動接続に切り替えました');
+      showManual(enc(pc.localDescription),
+        '① 上のコードをコピーして相手に送る（LINEなど）　② 相手から返ってきたコードを下に貼って「接続」');
+    }
+  }catch(err){ netStatus('エラー：'+(err&&err.message||err)); netClose(); }
+}
+async function joinRoom(code){
+  if(!window.RTCPeerConnection){ netStatus('この環境ではオンライン対戦を使えません'); return; }
+  if(!/^\d{4}$/.test(code)){ netStatus('4桁コードか、下の手動接続をどうぞ'); return; }
+  if(!window.storage){ netStatus('この環境では4桁コードが使えません。手動接続をどうぞ'); return; }
+  netClose();
+  NET.role='guest'; NET.code=code;
+  netStatus('部屋を探しています…');
+  try{
+    let off=null;
+    try{ off=await window.storage.get('cbroom-'+code+'-offer', true); }
+    catch(e){
+      netStatus('この環境では4桁コードが使えません。下の手動接続をどうぞ');
+      return;
+    }
+    if(!off || !off.value){ netStatus('部屋が見つかりません'); return; }
+    const od=JSON.parse(off.value);
+    if(Date.now()-od.t > 5*60*1000){ netStatus('この部屋は期限切れです'); return; }
+    const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+    guestPcSetup(pc);
+    await pc.setRemoteDescription(JSON.parse(od.sdp));
+    const ans=await pc.createAnswer();
+    await pc.setLocalDescription(ans);
+    await sdpWait(pc);
+    await window.storage.set('cbroom-'+code+'-answer',
+      JSON.stringify({t:Date.now(), sdp:JSON.stringify(pc.localDescription)}), true);
+    netStatus('接続中…（相手の準備を待っています）');
+  }catch(err){ netStatus('エラー：'+(err&&err.message||err)); netClose(); }
+}
+function joinManual(){
+  if(!window.RTCPeerConnection){ netStatus('この環境ではオンライン対戦を使えません'); return; }
+  netClose();
+  NET.role='guest';
+  showManual('', '相手の接続コード（CB1.で始まる長い文字列）を下に貼って「接続」');
+}
+async function manualNext(){
+  const txt=document.getElementById('codeIn').value;
+  try{
+    if(NET.role==='host'){
+      if(!NET.pc){ mh('先に「部屋を作る」からやり直してください'); return; }
+      mh('接続中…つながると自動で試合が始まります');
+      await NET.pc.setRemoteDescription(dec(txt));
+    } else {
+      // ゲスト：相手のofferから応答コードを作る
+      const offer=dec(txt);
+      const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+      guestPcSetup(pc);
+      await pc.setRemoteDescription(offer);
+      const ans=await pc.createAnswer();
+      await pc.setLocalDescription(ans);
+      await sdpWait(pc);
+      document.getElementById('codeOut').value=enc(pc.localDescription);
+      mh('できた応答コードを上からコピーして相手に返し、開始を待ってください');
+    }
+  }catch(err){ mh('エラー：'+(err&&err.message||err)); }
+}
+function netGo(){
+  NET.connected=true;
+  if(NET.code){
+    rmKey('cbroom-'+NET.code+'-offer');
+    rmKey('cbroom-'+NET.code+'-answer');
+  }
+  const mb=document.getElementById('manualBox'); if(mb) mb.hidden=true;
+  netSendR({c:'go'});
+  startGame('net-host');
+}
+function netOnMsg(m){
+  if(m.c==='go'){
+    if(NET.role==='guest' && mode!=='net-guest'){ NET.connected=true; startGame('net-guest'); }
+    return;
+  }
+  if(NET.role==='host') hostMsg(m); else guestMsg(m);
+}
+/* --- ホスト側：ゲスト入力の適用 --- */
+function hostMsg(m){
+  if(phase!=='play') return;
+  if(m.c==='mi'){ NET.mTarget={x:(1-m.u)*W, y:(1-m.v)*H}; return; }
+  if(m.c==='bm'){ fireBeam(1, (1-m.u)*W, (1-m.v)*H); return; }
+  if(m.c==='ss'){ if(!P[1].lock) NET.gmap[m.id]=newStroke(1); return; }
+  if(m.c==='sp'){
+    const st=NET.gmap[m.id];
+    if(st && !st.done) addPoint(1, st, (1-m.u)*W, (1-m.v)*H);
+    return;
+  }
+  if(m.c==='se'){
+    const st=NET.gmap[m.id];
+    if(st && !st.done) finalizeStroke(1, st);
+    delete NET.gmap[m.id];
+    return;
+  }
+}
+function netHostFrame(dt){
+  // ゲストのマレットを目標へ追従
+  if(NET.mTarget){
+    const m=P[1].mallet;
+    const nx=Math.max(sideW+m.r, Math.min(W-sideW-m.r, NET.mTarget.x));
+    const ny=Math.max(wallT+m.r,  Math.min(midY()-m.r,  NET.mTarget.y));
+    const ox2=m.x, oy2=m.y;
+    if(dist(m.x,m.y,nx,ny) > 90){ m.x=nx; m.y=ny; }   // 大きく離れたら即座に合わせる
+    else {
+      const k=Math.min(1, dt*22);
+      m.x += (nx-m.x)*k; m.y += (ny-m.y)*k;
+    }
+    if(dt>0){
+      m.vx=0.6*m.vx+0.4*(m.x-ox2)/dt;
+      m.vy=0.6*m.vy+0.4*(m.y-oy2)/dt;
+    }
+  }
+}
+function sendHostState(){
+  if(phase!=='play' || mode!=='net-host') return;
+  const s=[];
+  for(let o=0;o<2;o++) for(const st of P[o].strokes){
+    let bits='';
+    for(const sg of st.segs) bits += sg.alive ? String(sg.hp) : '0';
+    s.push([st.nid, o, bits]);
+  }
+  netSendU({c:'st',
+    b:[ball.x/W, ball.y/H, ball.vx/W, ball.vy/H],
+    m:[[P[0].mallet.x/W, P[0].mallet.y/H],[P[1].mallet.x/W, P[1].mallet.y/H]],
+    en:[P[0].en, P[1].en], hp:[P[0].hp, P[1].hp], sc:[P[0].score, P[1].score],
+    idle:[P[0].idleT, P[1].idleT],
+    T, sp:servePlayer, gp:goalPauseT, ht:heat(),
+    cg:[P[0].cage?P[0].cage.nid:-1, P[1].cage?P[1].cage.nid:-1],
+    sh:beams.map(b2=>[b2.x/W, b2.y/H, b2.dx, b2.dy]),
+    s});
+}
+function sendGuestInput(){
+  if(phase!=='play' || mode!=='net-guest') return;
+  const m=P[0].mallet;
+  netSendU({c:'mi', u:1-m.x/W, v:1-m.y/H});
+}
+// 描画ループが間引かれても通信が止まらないよう、タイマーで送信する
+setInterval(sendHostState, 50);
+setInterval(sendGuestInput, 33);
+/* --- ゲスト側：ホストからの反映（座標は180°回転写像） --- */
+function guestMsg(m){
+  if(m.c==='ss'){ NET.rs[m.id]={owner:1-m.o, pts:[], segs:[], closed:false, done:true, nid:m.id}; return; }
+  if(m.c==='sp'){
+    const st=NET.rs[m.id]; if(!st) return;
+    const X=(1-m.u)*W, Y=(1-m.v)*H;
+    if(st.pts.length){
+      const a=st.pts[st.pts.length-1];
+      st.segs.push({ax:a.x,ay:a.y,bx:X,by:Y,hp:SEG_HP,alive:true,cool:0,born:liveT});
+    }
+    st.pts.push({x:X,y:Y});
+    return;
+  }
+  if(m.c==='se'){
+    const st=NET.rs[m.id]; if(!st) return;
+    if(m.cl && st.pts.length>2){
+      const a=st.pts[0], b2=st.pts[st.pts.length-1];
+      st.segs.push({ax:b2.x,ay:b2.y,bx:a.x,by:a.y,hp:SEG_HP,alive:true,cool:0,born:liveT});
+      st.closed=true;
+    }
+    return;
+  }
+  if(m.c==='st'){ guestState(m); return; }
+  if(m.c==='end'){ netShowEnd(m.w, m.line); return; }
+}
+function guestState(m){
+  if(phase!=='play') return;
+  NET.target.b=[(1-m.b[0])*W, (1-m.b[1])*H, -m.b[2]*W, -m.b[3]*H];
+  NET.target.m1=[(1-m.m[0][0])*W, (1-m.m[0][1])*H]; // ホストP0＝表示P1
+  for(let o=0;o<2;o++){
+    const d=1-o;
+    P[d].en=m.en[o];
+    if(m.hp[o] < NET.lastHp[o]){
+      P[d].flashT=0.6;
+      floats.push({x:P[d].mallet.x, y:P[d].mallet.y-24, txt:'-1', life:0.9});
+      flashes.push({x:P[d].mallet.x, y:P[d].mallet.y, r:10, life:0.6, col:RED});
+      beep(110,0.3,'sawtooth',0.07);
+    }
+    P[d].hp=m.hp[o];
+    if(m.sc[o] > NET.lastSc[o]){
+      floats.push({x:W/2, y: d===0 ? H-wallT-50 : wallT+50, txt:'+1 GOAL', life:1.2});
+      beep(660,0.12,'square',0.05);
+    }
+    P[d].score=m.sc[o];
+    P[d].idleT=m.idle[o];
+  }
+  NET.lastHp=[m.hp[0], m.hp[1]];
+  NET.lastSc=[m.sc[0], m.sc[1]];
+  T=m.T;
+  servePlayer = m.sp>=0 ? 1-m.sp : -1;
+  goalPauseT=m.gp;
+  heatT=(m.ht-1)/HEAT_RATE;
+  // ストローク生存・所属
+  const seen={};
+  for(const ent of m.s){
+    const id=ent[0], bits=ent[2];
+    seen[id]=1;
+    const st=NET.rs[id]; if(!st) continue;
+    for(let i=0;i<st.segs.length && i<bits.length;i++){
+      const h=+bits[i];
+      st.segs[i].hp=h;
+      st.segs[i].alive=h>0;
+    }
+  }
+  for(const id in NET.rs){ if(!seen[id]) delete NET.rs[id]; }
+  P[0].strokes=[]; P[1].strokes=[]; P[0].cage=null; P[1].cage=null;
+  for(const id in NET.rs){
+    const st=NET.rs[id];
+    P[st.owner].strokes.push(st);
+    if(+id===m.cg[0] && st.owner===1) P[1].cage=st;
+    if(+id===m.cg[1] && st.owner===0) P[0].cage=st;
+  }
+  // 弾（反転）
+  beams=m.sh.map(a=>({x:(1-a[0])*W, y:(1-a[1])*H, dx:-a[2], dy:-a[3], owner:0}));
+  if(servePlayer<0 && goalPauseT<=0 && NET.target.b){
+    // サーブ直後の座標ワープを防ぐため強スナップ
+    if(dist(ball.x,ball.y,NET.target.b[0],NET.target.b[1]) > 160){
+      ball.x=NET.target.b[0]; ball.y=NET.target.b[1];
+    }
+  } else if(NET.target.b){
+    ball.x=NET.target.b[0]; ball.y=NET.target.b[1];
+  }
+}
+function guestUpdate(dt){
+  const B=NET.target;
+  if(B.b){
+    if(dist(ball.x,ball.y,B.b[0],B.b[1]) > 130){
+      ball.x=B.b[0]; ball.y=B.b[1];
+    } else {
+      ball.x += (B.b[0]-ball.x)*Math.min(1, dt*14) + B.b[2]*dt*0.4;
+      ball.y += (B.b[1]-ball.y)*Math.min(1, dt*14) + B.b[3]*dt*0.4;
+    }
+  }
+  if(B.m1){
+    const m=P[1].mallet;
+    if(dist(m.x,m.y,B.m1[0],B.m1[1]) > 90){ m.x=B.m1[0]; m.y=B.m1[1]; }
+    else {
+      m.x += (B.m1[0]-m.x)*Math.min(1, dt*16);
+      m.y += (B.m1[1]-m.y)*Math.min(1, dt*16);
+    }
+  }
+  liveT+=dt; // 線フェード表示用（厳密でなくてよい）
+  for(const p of P){ if(p.flashT>0) p.flashT-=dt; }
+  for(const f of flashes) f.life-=dt;
+  flashes=flashes.filter(f=>f.life>0);
+  for(const f of floats) f.life-=dt;
+  floats=floats.filter(f=>f.life>0);
+}
+function netShowEnd(w, line){
+  phase='over';
+  document.getElementById('btnAgain').style.display='none';
+  document.getElementById('winner').textContent=w;
+  document.getElementById('resultLine').textContent=line||'';
+  document.getElementById('over').hidden=false;
+}
+
+/* ================= 入力 ================= */
+const pointers=new Map();
+function ownerAt(y){
+  if(mode==='2p') return y>midY() ? 0 : 1;
+  return y>midY() ? 0 : null;
+}
+cv.addEventListener('pointerdown', e=>{
+  initAudio();
+  if(phase!=='play') return;
+  const f=toF(e);
+  const o=ownerAt(f.y);
+  let type='pen';
+  if(o!==null){
+    const m=P[o].mallet;
+    if(dist(f.x, f.y, m.x, m.y) < m.r+16) type='mallet';
+  }
+  pointers.set(e.pointerId, {owner:o, type, sx:f.x, sy:f.y,
+                             t:performance.now(), lt:performance.now(), stroke:null});
+  try{ cv.setPointerCapture(e.pointerId); }catch(_){}
+});
+cv.addEventListener('pointermove', e=>{
+  const rec=pointers.get(e.pointerId);
+  if(!rec || rec.owner===null || phase!=='play') return;
+  const f=toF(e);
+  const p=P[rec.owner];
+  if(rec.type==='mallet'){
+    const m=p.mallet;
+    const now=performance.now();
+    const dtm=Math.max(8, now-rec.lt)/1000; rec.lt=now;
+    let nx=Math.max(sideW+m.r, Math.min(W-sideW-m.r, f.x));
+    let ny;
+    if(rec.owner===0) ny=Math.max(midY()+m.r, Math.min(H-wallT-m.r, f.y));
+    else              ny=Math.max(wallT+m.r,  Math.min(midY()-m.r,  f.y));
+    m.vx = 0.5*m.vx + 0.5*(nx-m.x)/dtm;
+    m.vy = 0.5*m.vy + 0.5*(ny-m.y)/dtm;
+    m.x=nx; m.y=ny;
+    return;
+  }
+  if(mode==='net-guest'){
+    // 線引きはイベントとしてホストへ送る（描画はホストのエコーで反映）
+    if(!rec.gs){
+      if(dist(rec.sx,rec.sy,f.x,f.y) > 12){
+        if(P[0].cage || goalPauseT>0 || servePlayer>=0) return;
+        rec.gs=++NET.seq;
+        rec.lp={x:rec.sx, y:rec.sy};
+        netSendR({c:'ss', id:rec.gs});
+        netSendR({c:'sp', id:rec.gs, u:1-rec.sx/W, v:1-rec.sy/H});
+      } else return;
+    }
+    if(dist(rec.lp.x,rec.lp.y,f.x,f.y) >= 9){
+      rec.lp={x:f.x, y:f.y};
+      netSendR({c:'sp', id:rec.gs, u:1-f.x/W, v:1-f.y/H});
+    }
+    return;
+  }
+  if(!rec.stroke){
+    if(dist(rec.sx,rec.sy,f.x,f.y) > 12){
+      if(p.lock || goalPauseT>0 || servePlayer>=0) return;
+      rec.stroke=newStroke(rec.owner);
+      addPoint(rec.owner, rec.stroke, rec.sx, rec.sy);
+    } else return;
+  }
+  if(!addPoint(rec.owner, rec.stroke, f.x, f.y)){
+    finalizeStroke(rec.owner, rec.stroke);
+    rec.stroke=null; rec.owner=null; // インク切れで終了
+  }
+});
+function pointerEnd(e){
+  const rec=pointers.get(e.pointerId);
+  pointers.delete(e.pointerId);
+  if(!rec || rec.owner===null || phase!=='play') return;
+  if(rec.type==='mallet') return;
+  const f=toF(e);
+  if(mode==='net-guest'){
+    if(rec.gs){ netSendR({c:'se', id:rec.gs}); }
+    else {
+      const dtc=performance.now()-rec.t;
+      if(dtc < 350 && dist(rec.sx,rec.sy,f.x,f.y) < 12){
+        netSendR({c:'bm', u:1-f.x/W, v:1-f.y/H});
+      }
+    }
+    return;
+  }
+  if(rec.stroke){
+    finalizeStroke(rec.owner, rec.stroke);
+  } else {
+    const dt=performance.now()-rec.t;
+    if(dt < 350 && dist(rec.sx,rec.sy,f.x,f.y) < 12){
+      fireBeam(rec.owner, f.x, f.y);
+    }
+  }
+}
+cv.addEventListener('pointerup', pointerEnd);
+cv.addEventListener('pointercancel', pointerEnd);
+cv.addEventListener('contextmenu', e=>e.preventDefault());
+
+/* ================= ゲーム管理 ================= */
+function startGame(m){
+  mode=m;
+  fieldLocked=false; resize(); fieldLocked=true; // この瞬間の画面をフィールド寸法として固定
+  P=[mkPlayer(0), mkPlayer(1)];
+  beams=[]; flashes=[]; floats=[];
+  T=GAME_TIME;
+  goalPauseT=0; serveWaitT=0; liveT=0; heatT=0;
+  NET.rs={}; NET.gmap={}; NET.mTarget=null;
+  NET.lastHp=[3,3]; NET.lastSc=[0,0]; NET.target={b:null, m1:null};
+  phase='play';
+  document.getElementById('btnAgain').style.display='';
+  document.getElementById('menu').hidden=true;
+  document.getElementById('online').hidden=true;
+  document.getElementById('over').hidden=true;
+  if(m==='net-guest'){
+    servePlayer=-1; stallT=0;
+    ball.x=W/2; ball.y=H/2; ball.vx=0; ball.vy=0;
+  } else {
+    setupServe(Math.random()<0.5?0:1);
+  }
+}
+function endGame(reason, winnerIdx){
+  phase='over';
+  const a=P[0].score, b=P[1].score;
+  const isNet = mode==='net-host' || mode==='net-guest';
+  const n0 = isNet ? 'YOU' : 'P1';
+  const n1 = mode==='ai' ? 'CPU' : (isNet ? '相手' : 'P2');
+  const nm=[n0,n1];
+  let w, line;
+  if(reason==='break'){
+    w = nm[winnerIdx]+' の勝ち';
+    line = `${n0} ${a} — ${b} ${n1}　マレット破壊`;
+  } else {
+    if(a>b) w=n0+' の勝ち';
+    else if(b>a) w=n1+' の勝ち';
+    else w='引き分け';
+    line = `${n0} ${a} — ${b} ${n1}`;
+  }
+  if(mode==='net-host'){
+    let gw;
+    if(reason==='break') gw = winnerIdx===1 ? 'YOU の勝ち' : '相手 の勝ち';
+    else gw = b>a ? 'YOU の勝ち' : (a>b ? '相手 の勝ち' : '引き分け');
+    netSendR({c:'end', w:gw, line:`YOU ${b} — ${a} 相手`+(reason==='break'?'　マレット破壊':'')});
+  }
+  document.getElementById('btnAgain').style.display = isNet ? 'none' : '';
+  document.getElementById('winner').textContent=w;
+  document.getElementById('resultLine').textContent=line;
+  document.getElementById('over').hidden=false;
+  beep(440,0.2,'square',0.05); setTimeout(()=>beep(330,0.3,'square',0.05),200);
+}
+document.getElementById('btnAI').onclick =()=>{ initAudio(); startGame('ai'); };
+document.getElementById('btn2P').onclick =()=>{ initAudio(); startGame('2p'); };
+document.getElementById('btnOnline').onclick=()=>{
+  initAudio();
+  document.getElementById('menu').hidden=true;
+  document.getElementById('online').hidden=false;
+  lobbyEnter();
+};
+document.getElementById('btnSeek').onclick=()=>{ initAudio(); lobbySeek(); };
+document.getElementById('myName').oninput=()=>{
+  if(NET.ws && NET.ws.readyState===1) NET.ws.send(JSON.stringify({t:'lobby_in', name:myName()}));
+};
+document.getElementById('btnBack').onclick=()=>{
+  NET.lobbyWant=false;
+  netClose();
+  NET.seeking=false; NET.mySeek=null; updateSeekBtn();
+  netStatus('');
+  document.getElementById('online').hidden=true;
+  document.getElementById('menu').hidden=false;
+};
+const DEFAULT_WS='wss://corebreak-server.onrender.com';
+{
+  const su=document.getElementById('srvUrl');
+  if(su && DEFAULT_WS) su.value=DEFAULT_WS;
+}
+document.getElementById('btnHost').onclick=()=>{
+  initAudio();
+  if(NET.ws && NET.ws.readyState===1){ NET.role='host'; NET.ws.send(JSON.stringify({t:'create'})); return; }
+  const url=document.getElementById('srvUrl').value.trim() || DEFAULT_WS;
+  if(url) wsHost(url);
+  else hostRoom();
+};
+document.getElementById('btnJoin').onclick=()=>{
+  initAudio();
+  const code=document.getElementById('joinCode').value.trim();
+  if(!/^\d{4}$/.test(code)){ netStatus('4桁のコードを入力してください'); return; }
+  if(NET.ws && NET.ws.readyState===1){ NET.role='guest'; NET.ws.send(JSON.stringify({t:'join', code})); return; }
+  const url=document.getElementById('srvUrl').value.trim() || DEFAULT_WS;
+  if(url) wsJoin(url, code);
+  else joinRoom(code);
+};
+document.getElementById('btnWake').onclick=async ()=>{
+  let u=document.getElementById('srvUrl').value.trim();
+  if(!u){ netStatus('サーバーURLを入れてください'); return; }
+  u=u.replace(/^wss:\/\//,'https://').replace(/^ws:\/\//,'http://');
+  if(!/^https?:\/\//.test(u)) u='https://'+u;
+  netStatus('サーバーを起こしています…（最大60秒）');
+  const t0=Date.now();
+  try{
+    await fetch(u, {mode:'no-cors', cache:'no-store'});
+    netStatus('サーバー起動OK（'+Math.round((Date.now()-t0)/1000)+'秒）。部屋を作れます');
+  }catch(_){
+    netStatus('起こせませんでした。URLを確認するか、少し待って再度お試しください');
+  }
+};
+document.getElementById('btnManual').onclick=()=>{ initAudio(); joinManual(); };
+document.getElementById('btnManualNext').onclick=()=>{ manualNext(); };
+document.getElementById('btnCopy').onclick=async ()=>{
+  const t=document.getElementById('codeOut');
+  if(!t.value){ mh('コピーするコードがまだありません'); return; }
+  try{
+    await navigator.clipboard.writeText(t.value);
+    mh('コピーしました。相手に送ってください');
+  }catch(_){
+    try{ t.select(); t.setSelectionRange(0, 999999); document.execCommand('copy'); mh('コピーしました。相手に送ってください'); }
+    catch(__){ mh('コピーできませんでした。長押しで全選択してコピーしてください'); }
+  }
+};
+document.getElementById('btnAgain').onclick=()=>startGame(mode);
+document.getElementById('btnMenu').onclick=()=>{
+  phase='menu';
+  netClose();
+  netStatus('部屋を作るか、相手のコードを入れて参加');
+  fieldLocked=false; resize();
+  document.getElementById('over').hidden=true;
+  document.getElementById('online').hidden=true;
+  document.getElementById('menu').hidden=false;
+};
+
+/* ================= 更新 ================= */
+function update(dt){
+  if(phase!=='play') return;
+  if(mode==='net-guest'){ guestUpdate(dt); return; }
+  const live = goalPauseT<=0 && servePlayer<0;
+  if(live){
+    T-=dt;
+    if(T<=0){ T=0; endGame(); return; }
+  }
+
+  for(const p of P){
+    if(p.cage){
+      p.cageT+=dt;
+      p.en-=CAGE_DRAIN*dt;
+      if(!pointInPoly(ball.x, ball.y, p.cage.pts)){
+        endCage(p,false); // 脱出：線は残る
+      } else if(p.cageT>CAGE_MAX || p.en<=0){
+        endCage(p,true);  // 自壊
+      }
+    } else {
+      p.en=Math.min(100, p.en+REGEN*dt);
+    }
+    if(p.en<0) p.en=0;
+    if(p.flashT>0) p.flashT-=dt;
+  }
+
+  for(const p of P){ p.mallet.vx *= (1-6*dt); p.mallet.vy *= (1-6*dt); }
+  for(const p of P){
+    p.strokes = p.strokes.filter(st => st===p.cage || !st.done || st.segs.some(sg=>sg.alive));
+  }
+
+  if(goalPauseT>0){
+    goalPauseT-=dt;
+    if(goalPauseT<=0) setupServe(pendingServe);
+  } else if(servePlayer>=0){
+    serveWaitT+=dt;
+    serveStrike();
+    if(servePlayer>=0 && serveWaitT>4){
+      // 自動サーブ（時間切れ）
+      const dir = servePlayer===0 ? -1 : 1;
+      ball.vx=(Math.random()*120-60);
+      ball.vy=SERVE_SPD*dir;
+      servePlayer=-1;
+    }
+  } else {
+    liveT+=dt;
+    heatT+=dt;
+    stepBall(dt);
+    updateShots(dt);
+    // 加熱：球の巡航速度を底上げ
+    {
+      const s=Math.hypot(ball.vx, ball.vy);
+      const floor=CRUISE*heat();
+      if(s>1 && s<floor){
+        const t2=s + (floor-s)*Math.min(1, dt*2);
+        ball.vx*=t2/s; ball.vy*=t2/s;
+      }
+    }
+    // マレット静止ペナルティ：22px圏から3秒出ないとHP-1
+    for(let i=0;i<2;i++){
+      const p=P[i], m=p.mallet;
+      if(dist(m.x,m.y,p.iax,p.iay) > IDLE_MOVE){
+        p.iax=m.x; p.iay=m.y; p.idleT=0;
+      } else {
+        p.idleT+=dt;
+        if(p.idleT >= IDLE_MAX){
+          p.idleT=0; p.iax=m.x; p.iay=m.y;
+          damageCore(i, 1-i, m.x, m.y);
+          if(phase!=='play') return;
+        }
+      }
+    }
+    // 線の寿命
+    for(const p of P) for(const st of p.strokes){
+      if(st===p.cage) continue;
+      for(const sg of st.segs){
+        if(sg.alive && liveT - sg.born > LINE_LIFE) sg.alive=false;
+      }
+    }
+    // 膠着検知：半径46pxの円から2秒出なければRESET（速度は見ない＝角の震えも捕まえる）
+    if(P[0].cage || P[1].cage){
+      stallT=0; stallX=ball.x; stallY=ball.y; // 檻は専用の自壊ルールに任せる
+    } else if(dist(ball.x, ball.y, stallX, stallY) > 46){
+      stallT=0; stallX=ball.x; stallY=ball.y;
+    } else {
+      stallT+=dt;
+    }
+    if(stallT > 2.0){
+      stallT=0;
+      const m0=P[0].mallet, m1=P[1].mallet;
+      const d0=dist(ball.x,ball.y,m0.x,m0.y)-m0.r;
+      const d1=dist(ball.x,ball.y,m1.x,m1.y)-m1.r;
+      let fault;
+      if(Math.min(d0,d1) < BALL_R+30) fault = d0<d1 ? 0 : 1; // 押さえてる側
+      else fault = ball.y > midY() ? 0 : 1;                   // 球が死んでる側
+      floats.push({x:Math.max(60,Math.min(W-60,ball.x)), y:Math.max(60,ball.y-20), txt:'RESET', life:1});
+      beep(180,0.15,'square',0.04);
+      setupServe(1-fault); // 相手ボールで再開
+    }
+  }
+
+  if(mode==='ai'){ aiTick(dt); aiMallet(dt); }
+  if(mode==='net-host') netHostFrame(dt);
+
+  for(const f of flashes) f.life-=dt;
+  flashes=flashes.filter(f=>f.life>0);
+  for(const f of floats) f.life-=dt;
+  floats=floats.filter(f=>f.life>0);
+}
+
+/* ================= 描画 ================= */
+const hc=document.createElement('canvas'); hc.width=8; hc.height=8;
+{
+  const h2=hc.getContext('2d');
+  h2.strokeStyle='#8A8A85'; h2.lineWidth=1;
+  h2.beginPath(); h2.moveTo(-2,10); h2.lineTo(10,-2); h2.stroke();
+  h2.beginPath(); h2.moveTo(-2,2); h2.lineTo(2,-2); h2.stroke();
+}
+let HATCH=null;
+
+function segWidth(hp){ return Math.max(1, hp*2.4 - 1.2); }
+
+function render(){
+  if(!HATCH) HATCH=x.createPattern(hc,'repeat');
+  x.setTransform(DPR,0,0,DPR,0,0);
+  x.fillStyle=BG; x.fillRect(0,0,VW,VH);
+  x.setTransform(DPR*SC,0,0,DPR*SC, DPR*OX, DPR*OY);
+  const mh=mouthHalf(), my=midY();
+
+  // 中央線
+  x.strokeStyle='#B9B9B4'; x.lineWidth=1;
+  x.setLineDash([6,8]);
+  x.beginPath(); x.moveTo(sideW,my); x.lineTo(W-sideW,my); x.stroke();
+  x.setLineDash([]);
+
+  // 壁
+  x.strokeStyle=INK; x.lineWidth=4; x.lineCap='butt';
+  x.beginPath(); x.moveTo(sideW,wallT); x.lineTo(sideW,H-wallT); x.stroke();
+  x.beginPath(); x.moveTo(W-sideW,wallT); x.lineTo(W-sideW,H-wallT); x.stroke();
+  x.lineWidth=6;
+  // 上端（マウスの切れ目）
+  x.beginPath(); x.moveTo(sideW,wallT); x.lineTo(W/2-mh,wallT); x.stroke();
+  x.beginPath(); x.moveTo(W/2+mh,wallT); x.lineTo(W-sideW,wallT); x.stroke();
+  // 下端
+  x.beginPath(); x.moveTo(sideW,H-wallT); x.lineTo(W/2-mh,H-wallT); x.stroke();
+  x.beginPath(); x.moveTo(W/2+mh,H-wallT); x.lineTo(W-sideW,H-wallT); x.stroke();
+
+  // マレット（＝コア）
+  for(const p of P){
+    const m=p.mallet;
+    const col = p.flashT>0 ? RED : INK;
+    x.strokeStyle=col; x.lineWidth=5;
+    x.beginPath(); x.arc(m.x, m.y, m.r-3, 0, Math.PI*2); x.stroke();
+    x.fillStyle=col;
+    x.beginPath(); x.arc(m.x, m.y, 3, 0, Math.PI*2); x.fill();
+    // HPリング（3分割・太め）
+    for(let i=0;i<3;i++){
+      const a0=-Math.PI/2 + i*(Math.PI*2/3)+0.16;
+      const a1=-Math.PI/2 + (i+1)*(Math.PI*2/3)-0.16;
+      x.strokeStyle = i < p.hp ? col : '#DBDBD6';
+      x.lineWidth=4;
+      x.beginPath(); x.arc(m.x, m.y, m.r+8, a0, a1); x.stroke();
+    }
+    // 静止警告アーク
+    if(phase==='play' && p.idleT > 1.2){
+      const fr=Math.min(1, (p.idleT-1.2)/(IDLE_MAX-1.2));
+      x.strokeStyle = fr > 0.72 ? RED : '#8A8A85';
+      x.lineWidth=2;
+      x.beginPath(); x.arc(m.x, m.y, m.r+15, -Math.PI/2, -Math.PI/2 + fr*Math.PI*2);
+      x.stroke();
+    }
+  }
+
+  // ストローク
+  for(const p of P){
+    for(const st of p.strokes){
+      // 檻ハッチング
+      if(p.cage===st){
+        x.save();
+        x.globalAlpha=0.55;
+        x.fillStyle=HATCH;
+        x.beginPath();
+        st.pts.forEach((q,i)=> i?x.lineTo(q.x,q.y):x.moveTo(q.x,q.y));
+        x.closePath(); x.fill();
+        x.restore();
+      }
+      x.lineCap='round';
+      for(const sg of st.segs){
+        if(!sg.alive) continue;
+        let al=1;
+        if(p.cage!==st){
+          const rem=LINE_LIFE-(liveT-sg.born);
+          if(rem<0.6) al=Math.max(0, rem/0.6);
+        }
+        x.globalAlpha=al;
+        x.strokeStyle=INK;
+        x.lineWidth=segWidth(sg.hp);
+        x.beginPath(); x.moveTo(sg.ax,sg.ay); x.lineTo(sg.bx,sg.by); x.stroke();
+      }
+      x.globalAlpha=1;
+    }
+  }
+
+  // ボール
+  x.fillStyle=INK;
+  x.globalAlpha = goalPauseT>0 ? 0.15 : 1;
+  x.beginPath(); x.arc(ball.x, ball.y, BALL_R, 0, Math.PI*2); x.fill();
+  x.globalAlpha=1;
+  // サーブ待ち表示
+  if(servePlayer>=0 && phase==='play'){
+    const pulse = 4 + Math.sin(performance.now()/180)*2;
+    x.strokeStyle=INK; x.lineWidth=1.2;
+    x.setLineDash([4,5]);
+    x.beginPath(); x.arc(ball.x, ball.y, BALL_R+6+pulse, 0, Math.PI*2); x.stroke();
+    x.setLineDash([]);
+  }
+
+  // ビーム弾
+  for(const b of beams){
+    const tx2=b.x-b.dx*30, ty2=b.y-b.dy*30;
+    x.lineCap='round';
+    x.strokeStyle=BG; x.lineWidth=6;
+    x.beginPath(); x.moveTo(tx2,ty2); x.lineTo(b.x,b.y); x.stroke();
+    x.strokeStyle=INK; x.lineWidth=2.2;
+    x.beginPath(); x.moveTo(tx2,ty2); x.lineTo(b.x,b.y); x.stroke();
+    x.fillStyle=INK;
+    x.beginPath(); x.arc(b.x,b.y,3.5,0,Math.PI*2); x.fill();
+  }
+
+  // フラッシュ
+  for(const f of flashes){
+    x.strokeStyle=f.col;
+    x.globalAlpha=Math.max(0,f.life)*1.6;
+    x.lineWidth=2;
+    x.beginPath(); x.arc(f.x,f.y,f.r+(0.6-f.life)*50,0,Math.PI*2); x.stroke();
+    x.globalAlpha=1;
+  }
+
+  // フロートテキスト
+  x.font='700 16px ui-monospace, Menlo, monospace';
+  x.textAlign='center';
+  for(const f of floats){
+    x.globalAlpha=Math.min(1,f.life);
+    x.fillStyle=INK;
+    x.fillText(f.txt, f.x, f.y - (1.4-f.life)*20);
+    x.globalAlpha=1;
+  }
+
+  // エネルギーバー
+  drawEnergy(P[0], H-7);
+  drawEnergy(P[1], 7);
+
+  // HPピップ（画面端の大きな表示）
+  drawHPPips(P[0]);
+  drawHPPips(P[1]);
+
+  // スコア・タイマー
+  if(phase==='play' || phase==='over'){
+    x.font='800 20px ui-monospace, Menlo, monospace';
+    x.fillStyle=INK; x.textAlign='left';
+    const isNet = mode==='net-host' || mode==='net-guest';
+    const n0r = isNet ? 'YOU' : 'P1';
+    const n1r = mode==='ai' ? 'CPU' : (isNet ? '相手' : 'P2');
+    x.fillText(n0r+' '+P[0].score, 16, my+28);
+    if(mode==='2p'){
+      x.save(); x.translate(W-16, my-28); x.rotate(Math.PI);
+      x.textAlign='left';
+      x.fillText('P2 '+P[1].score, 0, 0);
+      x.restore();
+    } else {
+      x.fillText(n1r+' '+P[1].score, 16, my-14);
+    }
+    // タイマー
+    x.textAlign='center';
+    x.fillStyle=BG;
+    x.beginPath(); x.arc(W/2,my,20,0,Math.PI*2); x.fill();
+    x.strokeStyle=INK; x.lineWidth=1.5;
+    x.beginPath(); x.arc(W/2,my,20,0,Math.PI*2); x.stroke();
+    x.fillStyle=INK;
+    x.font='700 14px ui-monospace, Menlo, monospace';
+    x.fillText(Math.ceil(T), W/2, my+5);
+    // 加熱表示
+    const hs=heat();
+    if(hs > 1.05){
+      x.fillStyle = hs >= HEAT_MAX-0.01 ? RED : '#8A8A85';
+      x.font='700 11px ui-monospace, Menlo, monospace';
+      x.fillText('×'+hs.toFixed(1), W/2, my+36);
+    }
+  }
+  x.textAlign='start';
+}
+function drawHPPips(p){
+  const s=15, gap=23;
+  const px0 = 26;
+  const py = p.side===0 ? H-46 : 26;
+  x.font='700 10px ui-monospace, Menlo, monospace';
+  x.fillStyle='#8A8A85'; x.textAlign='left';
+  x.fillText('HP', px0, p.side===0 ? py-5 : py+s+12);
+  for(let i=0;i<3;i++){
+    const px=px0 + i*gap;
+    if(i < p.hp){
+      x.fillStyle = p.flashT>0 ? RED : INK;
+      x.fillRect(px, py, s, s);
+    } else {
+      x.strokeStyle = p.flashT>0 ? RED : '#C9C9C4';
+      x.lineWidth=1.5;
+      x.strokeRect(px+0.5, py+0.5, s-1, s-1);
+    }
+  }
+}
+function drawEnergy(p, y){
+  const x0=24, x1=W-24;
+  x.strokeStyle='#D5D5D0'; x.lineWidth=3;
+  x.beginPath(); x.moveTo(x0,y); x.lineTo(x1,y); x.stroke();
+  x.strokeStyle=INK;
+  x.beginPath(); x.moveTo(x0,y); x.lineTo(x0+(x1-x0)*p.en/100, y); x.stroke();
+  // ビームコストの目盛り
+  const tick=x0+(x1-x0)*BEAM_COST/100;
+  x.beginPath(); x.moveTo(tick,y-4); x.lineTo(tick,y+4); x.stroke();
+}
+
+/* ================= ループ ================= */
+let last=performance.now();
+function loop(t){
+  const dt=Math.min(0.033,(t-last)/1000);
+  last=t;
+  try{
+    if(P.length) update(dt);
+    if(P.length) render();
+    else { x.setTransform(DPR,0,0,DPR,0,0); x.fillStyle=BG; x.fillRect(0,0,VW,VH); }
+  }catch(err){
+    // 1フレームの例外でループ全体が死なないようにする
+    console.error('frame error:', err);
+  }
+  requestAnimationFrame(loop);
+}
+P=[mkPlayer(0), mkPlayer(1)];
+ball.x=W/2; ball.y=H/2;
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
