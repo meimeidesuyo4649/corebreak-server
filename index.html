@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>COREBREAK</title>
+<title>COREBREAK — AI DUEL</title>
 <style>
   :root{ --ink:#141414; --bg:#F6F6F3; --red:#D93025; }
   *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -130,6 +130,7 @@
   #resultLine{ font-size:15px; letter-spacing:.1em; line-height:1.9; }
   #winner{ font-size:clamp(24px,7vw,40px); font-weight:800; letter-spacing:.12em; }
   .note{ font-size:11px; color:#777; letter-spacing:.08em; }
+  .soloRemoved{ display:none !important; }
 </style>
 </head>
 <body>
@@ -140,14 +141,14 @@
   <div class="sub">線を引け。芯を撃て。</div>
   <div class="modes">
     <button class="mode primary" id="btnAI">
-      <span class="mName">AIと対戦</span>
-      <span class="mDesc">CPU相手のシングルマッチ</span>
+      <span class="mName">AIと対決</span>
+      <span class="mDesc">CPUを倒せ。90秒のシングルマッチ</span>
     </button>
-    <button class="mode" id="btnOnline">
+    <button class="mode soloRemoved" id="btnOnline" aria-hidden="true" tabindex="-1">
       <span class="mName">オンライン対戦</span>
       <span class="mDesc">部屋コードを共有して1対1</span>
     </button>
-    <button class="mode" id="btn2P">
+    <button class="mode soloRemoved" id="btn2P" aria-hidden="true" tabindex="-1">
       <span class="mName">2人で対戦</span>
       <span class="mDesc">1台の画面を上下で分け合うローカル戦</span>
     </button>
@@ -164,10 +165,10 @@
       球の押さえ込み・膠着は<b>RESET</b>：相手ボールで再開
     </div>
   </details>
-  <div class="ver">v1.1</div>
+  <div class="ver">SOLO v1.0</div>
 </div>
 
-<div class="ov" id="online" hidden>
+<div class="ov soloRemoved" id="online" hidden aria-hidden="true">
   <h2 class="scrTitle">ロビー</h2>
   <div class="lobbyWrap">
     <div class="lobbyBar">
@@ -1520,6 +1521,7 @@ cv.addEventListener('contextmenu', e=>e.preventDefault());
 
 /* ================= ゲーム管理 ================= */
 function startGame(m){
+  m='ai'; // SOLO版はAI戦以外を開始しない
   mode=m;
   const isNet = (m==='net-host' || m==='net-guest');
   fieldLocked=false; resize();
